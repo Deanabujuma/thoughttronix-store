@@ -95,6 +95,30 @@ def test_detail_shows_availability(client, unavailable_product):
     assert "Unavailable" in response.content.decode()
 
 
+FEATURED_BADGE = '<span class="badge badge-accent">Featured</span>'
+
+
+def test_catalog_shows_featured_badge_only_on_featured(client, product):
+    assert (
+        FEATURED_BADGE not in client.get(reverse("products:catalog")).content.decode()
+    )
+
+    product.is_featured = True
+    product.save()
+
+    assert FEATURED_BADGE in client.get(reverse("products:catalog")).content.decode()
+
+
+def test_detail_shows_featured_badge_only_on_featured(client, product):
+    url = product.get_absolute_url()
+    assert FEATURED_BADGE not in client.get(url).content.decode()
+
+    product.is_featured = True
+    product.save()
+
+    assert FEATURED_BADGE in client.get(url).content.decode()
+
+
 def test_category_page_lists_only_its_products(client, product):
     defense = Category.objects.create(name="Defense", slug="defense")
     Product.objects.create(
