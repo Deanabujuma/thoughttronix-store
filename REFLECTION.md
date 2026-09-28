@@ -1,5 +1,15 @@
 # Reflection
 
+## Discount Coupons
+
+### Question 1
+
+I was confused about whether a product-specific coupon would discount the whole cart or just the selected products. I asked Claude to clarify that. I decided that a code like HUB15 should discount Seraphine products only, so other items in the cart stay at their regular price.
+
+### Question 2
+
+When I reviewed checkout in the browser, I noticed that applying a code locked the coupon box. To try another code, I had to remove the first one. I wanted customers to be able to switch codes directly, so I asked Claude to make the box editable after applying a code. I tested it by replacing one code with HUB15 and then trying the expired SUMMER20. The valid code changed the discount, and the expired code showed an error without keeping the previous discount. One existing test, test_the_form_declares_no_imperative_validation, failed because the first version added a clean_coupon_code method to CheckoutForm. Claude moved coupon validation to a separate CouponForm, and the test suite passed afterward.
+
 ## Featured Products
 
 ### Question 1 - Trace the feature
