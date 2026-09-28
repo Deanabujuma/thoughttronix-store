@@ -45,13 +45,14 @@ def make_order(user, total, *, days_ago=0, status=Order.Status.PLACED):
     )
 
 
-def add_item(order, name, unit_price, quantity=1):
+def add_item(order, name, unit_price, quantity=1, discount="0.00"):
     return OrderItem.objects.create(
         order=order,
         product=None,
         product_name=name,
         unit_price=Decimal(unit_price),
         quantity=quantity,
+        discount_amount=Decimal(discount),
     )
 
 
@@ -186,6 +187,15 @@ def test_top_products_merge_lines_across_orders(customer):
     assert len(top) == 1
     assert top[0]["units"] == 3
     assert top[0]["revenue"] == Decimal("267.00")
+
+
+def test_top_products_count_what_was_charged_after_discounts(customer):
+    order = make_order(customer, "0.00")
+    add_item(order, "NapCap", "89.00", quantity=2, discount="17.80")  # 178 - 17.80
+
+    top = queries.top_products()
+
+    assert top[0]["revenue"] == Decimal("160.20")
 
 
 def test_top_products_respect_limit_cancellation_and_period(customer):

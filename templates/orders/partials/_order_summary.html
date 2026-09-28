@@ -1,0 +1,39 @@
+{% load humanize %}
+{# The checkout sidebar, priced from ``pricing`` (a CartPricing). Include #}
+{# with oob=True to swap it out-of-band from the discount-code preview. #}
+<div id="order-summary" class="card bg-base-100 shadow-md" {% if oob %}hx-swap-oob="true"{% endif %}>
+  <div class="card-body">
+    <h2 class="card-title">Your order</h2>
+    <ul class="space-y-2">
+      {% for line in pricing.lines %}
+        <li class="text-sm">
+          <div class="flex justify-between gap-4">
+            <span>{{ line.quantity }} × {{ line.product.name }}</span>
+            <span class="whitespace-nowrap">${{ line.line_total|intcomma }}</span>
+          </div>
+          {% if line.discount %}
+            <p class="text-right text-success">−${{ line.discount|intcomma }} with {{ pricing.coupon.code }}</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    <div class="divider my-2"></div>
+    {% if pricing.discount %}
+      <p class="flex justify-between text-sm">
+        <span>Subtotal</span>
+        <span>${{ pricing.subtotal|intcomma }}</span>
+      </p>
+      <p class="flex justify-between text-sm text-success">
+        <span>Discount ({{ pricing.coupon.code }}, {{ pricing.coupon.percent_off }}%)</span>
+        <span>−${{ pricing.discount|intcomma }}</span>
+      </p>
+    {% endif %}
+    <p class="flex justify-between font-semibold">
+      <span>Total</span>
+      <span class="text-primary">${{ pricing.total|intcomma }}</span>
+    </p>
+    <a href="{% url 'orders:cart' %}" class="link link-hover text-sm opacity-70">
+      Edit cart
+    </a>
+  </div>
+</div>

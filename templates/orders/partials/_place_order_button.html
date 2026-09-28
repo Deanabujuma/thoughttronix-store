@@ -1,0 +1,7 @@
+{% load humanize %}
+{# The checkout submit button, labeled with the discounted total. Include #}
+{# with oob=True to swap it out-of-band from the discount-code preview. #}
+<button type="submit" id="place-order" class="btn btn-primary w-full"
+        {% if oob %}hx-swap-oob="true"{% endif %}>
+  Place order — ${{ pricing.total|intcomma }}
+</button>

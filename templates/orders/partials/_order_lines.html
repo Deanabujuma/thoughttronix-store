@@ -1,0 +1,39 @@
+{% load humanize %}
+{# An order's lines at purchase-time prices — shared by the customer's and #}
+{# the back office's order detail. A discounted line shows its discount #}
+{# beneath the line total. #}
+<div class="overflow-x-auto rounded-box bg-base-100 shadow-md">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Price at purchase</th>
+        <th>Quantity</th>
+        <th class="text-right">Line total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order.items.all %}
+        <tr>
+          <td class="font-semibold">
+            {% if item.product %}
+              <a href="{{ item.product.get_absolute_url }}" class="link-hover">
+                {{ item.product_name }}
+              </a>
+            {% else %}
+              {{ item.product_name }}
+            {% endif %}
+          </td>
+          <td>${{ item.unit_price|intcomma }}</td>
+          <td>{{ item.quantity }}</td>
+          <td class="text-right">
+            <span class="font-semibold">${{ item.line_total|intcomma }}</span>
+            {% if item.discount_amount %}
+              <p class="text-xs text-success">−${{ item.discount_amount|intcomma }} with {{ order.discount_code }}</p>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

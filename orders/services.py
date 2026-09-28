@@ -11,7 +11,7 @@ from typing import Any
 from django.contrib.auth.models import AbstractBaseUser
 from django.db import transaction
 
-from .models import Cart, Order, OrderItem
+from .models import Cart, Coupon, Order, OrderItem
 
 ADDRESS_FIELDS = [
     "email",
@@ -46,11 +46,17 @@ def place_order(
     only the last four digits are stored; the full number and CVV never
     touch the database.
 
+    ``coupon_code``, when given, is redeemed here even if the checkout
+    form already validated it — a code can expire between the preview and
+    the click. The discount is snapshotted onto the order and each line:
+    ``Order.total`` is what the customer pays.
+
     All-or-nothing: runs in a transaction, so a failure partway through
     leaves no partial order and the cart intact.
 
     Raises ``ValueError`` if the cart is empty or holds a product that is
-    no longer available.
+    no longer available, and its subclass ``InvalidCouponError`` if the
+    code can't be applied.
     """
     lines = list(cart.lines())
     if not lines:
@@ -62,20 +68,28 @@ def place_order(
             "Remove them from the cart to check out."
         )
 
+    coupon = Coupon.objects.redeem(coupon_code, cart) if coupon_code else None
+    pricing = cart.priced(coupon)
+
     card_digits = checkout_data["card_number"].replace(" ", "").replace("-", "")
     order = Order.objects.create(
         user=user,
-        total=cart.total(),
+        total=pricing.total,
         card_last4=card_digits[-4:],
+        coupon=coupon,
+        discount_code=coupon.code if coupon else "",
+        discount_percent=coupon.percent_off if coupon else None,
+        discount_amount=pricing.discount,
         **{name: checkout_data[name] for name in ADDRESS_FIELDS},
     )
-    for line in lines:
+    for line in pricing.lines:
         OrderItem.objects.create(
             order=order,
             product=line.product,
             product_name=line.product.name,
-            unit_price=line.product.price,
+            unit_price=line.unit_price,
             quantity=line.quantity,
+            discount_amount=line.discount,
         )
     cart.items.all().delete()
     return order

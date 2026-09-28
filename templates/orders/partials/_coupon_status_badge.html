@@ -1,0 +1,6 @@
+{# A discount code's status as a DaisyUI badge: live, expired, or retired. #}
+{% with status=coupon.status %}
+  <span class="badge {% if status == 'live' %}badge-success{% elif status == 'expired' %}badge-warning{% else %}badge-neutral{% endif %}">
+    {{ status.label }}
+  </span>
+{% endwith %}

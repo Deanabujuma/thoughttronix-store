@@ -1,0 +1,39 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}
+  {% if form.instance.pk %}Edit discount code{% else %}New discount code{% endif %} — Back office
+{% endblock %}
+
+{% block backoffice %}
+  <div class="card mx-auto max-w-2xl bg-base-100 shadow-md">
+    <div class="card-body">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="card-title">
+          {% if form.instance.pk %}Edit {{ form.instance.code }}{% else %}New discount code{% endif %}
+        </h2>
+        {% if form.instance.pk %}
+          {% include "orders/partials/_coupon_status_badge.html" with coupon=form.instance %}
+        {% endif %}
+      </div>
+      {% if use_count %}
+        <div class="alert alert-info" role="status">
+          <span>
+            This code has been used on {{ use_count }} order{{ use_count|pluralize }}.
+            Its terms are locked — retire it and create a new code to change the deal.
+            You can still move its expiry date or switch it off.
+          </span>
+        </div>
+      {% endif %}
+      <form method="post" class="mt-2 space-y-4">
+        {% csrf_token %}
+        {% for field in form %}
+          {% include "products/partials/_field.html" %}
+        {% endfor %}
+        <div class="mt-2 flex items-center justify-end gap-2">
+          <a href="{% url 'orders:manage_coupons' %}" class="btn btn-ghost">Cancel</a>
+          <button type="submit" class="btn btn-primary">Save code</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

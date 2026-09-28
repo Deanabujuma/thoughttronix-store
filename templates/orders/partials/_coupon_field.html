@@ -1,0 +1,41 @@
+{# The checkout's discount-code control. Apply and Remove post just the code #}
+{# to the preview endpoint, which returns this partial again plus the order #}
+{# summary and place-order button out-of-band. An applied code is read-only #}
+{# until removed, so the preview always matches what the form will submit. #}
+{% with coupon=coupon_form.coupon %}
+  <div id="coupon-field">
+    <label class="label mb-1" for="id_coupon_code">Discount code</label>
+    <div class="join w-full">
+      {% if coupon %}
+        <input type="text" name="coupon_code" id="id_coupon_code" value="{{ coupon.code }}"
+               readonly class="input join-item w-full uppercase">
+        <button type="button" class="btn join-item"
+                hx-post="{% url 'orders:checkout_coupon' %}"
+                hx-params="coupon_code"
+                hx-vals='{"coupon_code": ""}'
+                hx-target="#coupon-field"
+                hx-swap="outerHTML">Remove</button>
+      {% else %}
+        <input type="text" name="coupon_code" id="id_coupon_code" maxlength="30"
+               class="input join-item w-full uppercase" placeholder="e.g. THOUGHTS10">
+        <button type="button" class="btn btn-secondary join-item"
+                hx-post="{% url 'orders:checkout_coupon' %}"
+                hx-params="coupon_code"
+                hx-target="#coupon-field"
+                hx-swap="outerHTML">Apply</button>
+      {% endif %}
+    </div>
+    {% if coupon %}
+      <p class="mt-1 text-sm text-success">
+        {{ coupon.code }} applied — {{ coupon.percent_off }}% off {% if coupon.applies_to == "PRODUCTS" %}selected products{% else %}your order{% endif %}.
+      </p>
+    {% endif %}
+    {% for error in coupon_form.coupon_code.errors %}
+      <p class="mt-1 text-sm text-error">{{ error }}</p>
+    {% endfor %}
+  </div>
+{% endwith %}
+{% if oob %}
+  {% include "orders/partials/_order_summary.html" %}
+  {% include "orders/partials/_place_order_button.html" %}
+{% endif %}

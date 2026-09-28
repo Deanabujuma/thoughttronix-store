@@ -1,0 +1,121 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Discount codes — Back office{% endblock %}
+
+{% block backoffice %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+    <h2 class="text-xl font-semibold">
+      {{ page_obj.paginator.count }} discount code{{ page_obj.paginator.count|pluralize }}
+    </h2>
+    <div class="flex flex-wrap items-center gap-4">
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="opacity-60">Status:</span>
+        <a href="{% querystring status=None page=None %}"
+           class="badge {% if not active_status %}badge-primary{% else %}badge-ghost{% endif %}">
+          all
+        </a>
+        {% for value, label in statuses %}
+          <a href="{% querystring status=value page=None %}"
+             class="badge {% if active_status == value %}badge-primary{% else %}badge-ghost{% endif %}">
+            {{ label }}
+          </a>
+        {% endfor %}
+      </div>
+      <a href="{% url 'orders:manage_coupon_create' %}" class="btn btn-primary btn-sm">
+        + Create code
+      </a>
+    </div>
+  </div>
+
+  {% if coupons %}
+    <div class="overflow-x-auto rounded-box bg-base-100 shadow-md">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Percent off</th>
+            <th>Applies to</th>
+            <th>Valid through</th>
+            <th>Status</th>
+            <th class="text-right">Uses</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for coupon in coupons %}
+            <tr>
+              <td>
+                <a href="{% url 'orders:manage_coupon_update' coupon.pk %}"
+                   class="link-hover font-mono font-semibold">{{ coupon.code }}</a>
+              </td>
+              <td>{{ coupon.percent_off }}%</td>
+              <td>
+                {% if coupon.applies_to == "PRODUCTS" %}
+                  {{ coupon.product_count }} product{{ coupon.product_count|pluralize }}
+                {% else %}
+                  Whole order
+                {% endif %}
+              </td>
+              <td>{{ coupon.expires_on|date:"M j, Y" }}</td>
+              <td>{% include "orders/partials/_coupon_status_badge.html" %}</td>
+              <td class="text-right">{{ coupon.use_count }}</td>
+              <td class="text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <a href="{% url 'orders:manage_coupon_update' coupon.pk %}"
+                     class="btn btn-ghost btn-xs">Edit</a>
+                  {% if not coupon.use_count %}
+                    <a href="{% url 'orders:manage_coupon_delete' coupon.pk %}"
+                       class="btn btn-ghost btn-xs text-error">Delete</a>
+                  {% elif coupon.is_active %}
+                    <form method="post" action="{% url 'orders:manage_coupon_retire' coupon.pk %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-ghost btn-xs text-warning">Retire</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_paginated %}
+      <div class="mt-8 flex justify-center">
+        <div class="join">
+          {% if page_obj.has_previous %}
+            <a href="{% querystring page=page_obj.previous_page_number %}" class="btn join-item">«</a>
+          {% else %}
+            <button class="btn join-item btn-disabled">«</button>
+          {% endif %}
+          <button class="btn join-item pointer-events-none">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+          </button>
+          {% if page_obj.has_next %}
+            <a href="{% querystring page=page_obj.next_page_number %}" class="btn join-item">»</a>
+          {% else %}
+            <button class="btn join-item btn-disabled">»</button>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="py-16 text-center">
+      {% if active_status %}
+        <p class="text-5xl">🗂️</p>
+        <p class="mt-4 text-xl font-semibold">No {{ active_status }} codes</p>
+        <p class="mt-2 opacity-70">Every promotion is somewhere else in its life.</p>
+        <a href="{% querystring status=None page=None %}" class="btn btn-primary btn-sm mt-6">
+          Show all codes
+        </a>
+      {% else %}
+        <p class="text-5xl">🎟️</p>
+        <p class="mt-4 text-xl font-semibold">No discount codes yet</p>
+        <p class="mt-2 opacity-70">Generosity, carefully rationed, starts here.</p>
+        <a href="{% url 'orders:manage_coupon_create' %}" class="btn btn-primary btn-sm mt-6">
+          Create code
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

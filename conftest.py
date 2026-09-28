@@ -4,13 +4,15 @@ Shared test data lives here as plain fixtures — no factories. The suite
 grows with the project; tests never invoke the seed command.
 """
 
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from accounts.models import Address
-from orders.models import Cart, CartItem
+from orders.models import Cart, CartItem, Coupon
 from products.models import Category, Product, Tag
 
 
@@ -87,3 +89,47 @@ def cart(customer):
 @pytest.fixture
 def cart_item(cart, product):
     return CartItem.objects.create(cart=cart, product=product, quantity=2)
+
+
+# Discount codes are dated relative to the store's own today, so the
+# expiry rules hold whenever the suite runs — no clock freezing needed.
+
+
+@pytest.fixture
+def whole_order_coupon(db):
+    return Coupon.objects.create(
+        code="THOUGHTS10",
+        percent_off=10,
+        expires_on=timezone.localdate() + timedelta(days=30),
+    )
+
+
+@pytest.fixture
+def product_coupon(product):
+    coupon = Coupon.objects.create(
+        code="HUB15",
+        percent_off=15,
+        applies_to=Coupon.AppliesTo.PRODUCTS,
+        expires_on=timezone.localdate() + timedelta(days=30),
+    )
+    coupon.products.add(product)
+    return coupon
+
+
+@pytest.fixture
+def expired_coupon(db):
+    return Coupon.objects.create(
+        code="SUMMER20",
+        percent_off=20,
+        expires_on=timezone.localdate() - timedelta(days=1),
+    )
+
+
+@pytest.fixture
+def retired_coupon(db):
+    return Coupon.objects.create(
+        code="LAUNCH25",
+        percent_off=25,
+        expires_on=timezone.localdate() + timedelta(days=30),
+        is_active=False,
+    )

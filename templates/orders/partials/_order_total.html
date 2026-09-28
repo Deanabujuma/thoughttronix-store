@@ -1,0 +1,23 @@
+{% load humanize %}
+{# An order's total — what the customer paid. A discounted order also shows #}
+{# its subtotal and discount; an undiscounted one looks as it always has. #}
+{# Include with staff=True to link the code to its back-office page. #}
+{% if order.discount_amount %}
+  <dl class="w-full space-y-1 text-sm">
+    <div class="flex justify-between gap-4">
+      <dt class="opacity-70">Subtotal</dt>
+      <dd>${{ order.subtotal|intcomma }}</dd>
+    </div>
+    <div class="flex justify-between gap-4 text-success">
+      {% if staff and order.coupon_id %}
+        {% url 'orders:manage_coupon_update' order.coupon_id as coupon_url %}
+        <dt>Discount (<a href="{{ coupon_url }}" class="link">{{ order.discount_code }}</a>, {{ order.discount_percent }}%)</dt>
+      {% else %}
+        <dt>Discount ({{ order.discount_code }}, {{ order.discount_percent }}%)</dt>
+      {% endif %}
+      <dd>−${{ order.discount_amount|intcomma }}</dd>
+    </div>
+  </dl>
+{% endif %}
+<p class="text-sm uppercase tracking-wide opacity-60">Order total</p>
+<p class="text-3xl font-bold text-primary">${{ order.total|intcomma }}</p>

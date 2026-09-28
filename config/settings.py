@@ -121,7 +121,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+# The store's own clock: discount codes expire at local midnight, and the
+# dashboard buckets sales by the local day.
+TIME_ZONE = "America/Chicago"
 
 USE_I18N = True
 

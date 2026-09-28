@@ -10,7 +10,7 @@ import pytest
 
 from products.models import Product
 
-from .models import CartItem, Order, OrderItem
+from .models import CartItem, InvalidCouponError, Order, OrderItem
 from .services import place_order
 from .test_checkout_form import VALID_DATA
 
@@ -124,7 +124,52 @@ def test_a_failure_midway_leaves_no_partial_order(
     assert CartItem.objects.count() == 2
 
 
-def test_the_coupon_seam_is_accepted_and_ignored(cart, cart_item, checkout_data):
+# --- Discount codes ------------------------------------------------------------
+
+
+def test_no_code_means_no_discount(cart, cart_item, checkout_data):
+    order = place_order(cart, cart.user, checkout_data)
+
+    assert order.coupon is None
+    assert order.discount_code == ""
+    assert order.discount_amount == Decimal("0.00")
+    assert order.subtotal == order.total
+
+
+def test_a_code_is_snapshotted_onto_the_order_and_its_lines(
+    cart, cart_item, checkout_data, whole_order_coupon
+):
+    order = place_order(cart, cart.user, checkout_data, coupon_code="thoughts10")
+
+    assert order.coupon == whole_order_coupon
+    assert order.discount_code == "THOUGHTS10"
+    assert order.discount_percent == 10
+    assert order.discount_amount == Decimal("70.00")
+    assert order.total == Decimal("629.98")  # what the customer paid
+    assert order.subtotal == Decimal("699.98")
+    item = order.items.get()
+    assert item.discount_amount == Decimal("70.00")
+    assert item.net_total == Decimal("629.98")
+
+
+def test_editing_or_retiring_a_code_never_changes_a_past_order(
+    cart, cart_item, checkout_data, whole_order_coupon
+):
     order = place_order(cart, cart.user, checkout_data, coupon_code="THOUGHTS10")
 
-    assert order.total == Decimal("699.98")
+    whole_order_coupon.percent_off = 50
+    whole_order_coupon.is_active = False
+    whole_order_coupon.save()
+
+    order.refresh_from_db()
+    assert order.discount_percent == 10
+    assert order.discount_amount == Decimal("70.00")
+    assert order.total == Decimal("629.98")
+
+
+def test_an_invalid_code_places_nothing(cart, cart_item, checkout_data, expired_coupon):
+    with pytest.raises(InvalidCouponError, match="SUMMER20 expired on"):
+        place_order(cart, cart.user, checkout_data, coupon_code="SUMMER20")
+
+    assert not Order.objects.exists()
+    assert cart.items.exists()

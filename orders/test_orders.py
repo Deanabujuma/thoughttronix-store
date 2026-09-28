@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import CartItem, Order
+from .models import CartItem, InvalidCouponError, Order
 from .services import place_order
 from .test_checkout_form import VALID_DATA
 
@@ -129,6 +129,87 @@ def test_an_invalid_checkout_preserves_input_and_places_nothing(
     assert CartItem.objects.exists()
 
 
+def test_a_cart_that_changes_mid_checkout_returns_to_the_cart(
+    client, customer, cart_item, monkeypatch
+):
+    """The page-load checks passed, but place_order's backstop refuses."""
+
+    def refuse(*args, **kwargs):
+        raise ValueError("No longer available: Seraphine Home Hub.")
+
+    monkeypatch.setattr("orders.views.place_order", refuse)
+    client.force_login(customer)
+
+    response = client.post(reverse("orders:checkout"), VALID_DATA, follow=True)
+
+    assert response.redirect_chain[-1][0] == reverse("orders:cart")
+    assert "No longer available: Seraphine Home Hub." in response.content.decode()
+    assert not Order.objects.exists()
+
+
+def test_checkout_with_a_code_places_a_discounted_order(
+    client, customer, cart_item, whole_order_coupon
+):
+    client.force_login(customer)
+
+    response = client.post(
+        reverse("orders:checkout"), {**VALID_DATA, "coupon_code": "thoughts10"}
+    )
+
+    order = Order.objects.get()
+    assert response.status_code == HTTPStatus.FOUND
+    assert order.discount_code == "THOUGHTS10"
+    assert order.total == Decimal("629.98")
+
+
+def test_a_bad_code_shows_its_error_and_places_nothing(
+    client, customer, cart_item, expired_coupon
+):
+    client.force_login(customer)
+
+    response = client.post(
+        reverse("orders:checkout"), {**VALID_DATA, "coupon_code": "SUMMER20"}
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert "SUMMER20 expired on" in response.content.decode()
+    assert not Order.objects.exists()
+    assert CartItem.objects.exists()
+
+
+def test_a_code_that_fails_the_backstop_lands_beside_the_field(
+    client, customer, cart_item, whole_order_coupon, monkeypatch
+):
+    """The form accepted the code; by the time place_order ran, it had died."""
+
+    def expire_mid_click(*args, **kwargs):
+        raise InvalidCouponError("THOUGHTS10 is no longer available.")
+
+    monkeypatch.setattr("orders.views.place_order", expire_mid_click)
+    client.force_login(customer)
+
+    response = client.post(
+        reverse("orders:checkout"), {**VALID_DATA, "coupon_code": "THOUGHTS10"}
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.context["coupon_form"].errors["coupon_code"] == [
+        "THOUGHTS10 is no longer available."
+    ]
+    assert not Order.objects.exists()
+
+
+def test_confirmation_shows_what_the_code_saved(
+    client, customer, cart, cart_item, whole_order_coupon
+):
+    order = place_order(cart, customer, dict(VALID_DATA), coupon_code="THOUGHTS10")
+    client.force_login(customer)
+
+    response = client.get(reverse("orders:confirmation", kwargs={"pk": order.pk}))
+
+    assert "You saved $70.00 with THOUGHTS10." in response.content.decode()
+
+
 def test_confirmation_shows_the_order_number(client, customer, order):
     client.force_login(customer)
 
@@ -175,6 +256,45 @@ def test_detail_shows_purchase_time_prices(client, customer, order):
     assert "349.99" in page
     assert "card ending 4242" in page
     assert "12 Cortex Lane" in page
+
+
+def test_detail_shows_each_lines_discount_and_the_summary(
+    client, customer, cart, cart_item, whole_order_coupon
+):
+    order = place_order(cart, customer, dict(VALID_DATA), coupon_code="THOUGHTS10")
+    client.force_login(customer)
+
+    response = client.get(reverse("orders:detail", kwargs={"pk": order.pk}))
+
+    page = response.content.decode()
+    assert "−$70.00 with THOUGHTS10" in page  # beneath the line
+    assert "Subtotal" in page and "$699.98" in page
+    assert "Discount (THOUGHTS10, 10%)" in page
+    assert "$629.98" in page
+
+
+def test_an_undiscounted_order_looks_as_it_always_has(client, customer, order):
+    client.force_login(customer)
+
+    page = client.get(
+        reverse("orders:detail", kwargs={"pk": order.pk})
+    ).content.decode()
+
+    assert "Subtotal" not in page
+    assert "Discount" not in page
+    assert "$699.98" in page
+
+
+def test_history_lists_the_amount_paid(
+    client, customer, cart, cart_item, whole_order_coupon
+):
+    place_order(cart, customer, dict(VALID_DATA), coupon_code="THOUGHTS10")
+    client.force_login(customer)
+
+    page = client.get(reverse("orders:history")).content.decode()
+
+    assert "$629.98" in page
+    assert "THOUGHTS10" not in page
 
 
 def test_customers_cannot_see_anothers_orders(client, other_customer, order):

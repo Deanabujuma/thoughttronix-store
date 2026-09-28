@@ -1,5 +1,4 @@
 {% extends "backoffice/base.html" %}
-{% load humanize %}
 
 {% block title %}Order {{ order.number }} — Back office{% endblock %}
 
@@ -14,35 +13,8 @@
     ({{ order.email }}) · card ending {{ order.card_last4 }}
   </p>
 
-  <div class="mt-6 overflow-x-auto rounded-box bg-base-100 shadow-md">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Product</th>
-          <th>Price at purchase</th>
-          <th>Quantity</th>
-          <th class="text-right">Line total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in order.items.all %}
-          <tr>
-            <td class="font-semibold">
-              {% if item.product %}
-                <a href="{{ item.product.get_absolute_url }}" class="link-hover">
-                  {{ item.product_name }}
-                </a>
-              {% else %}
-                {{ item.product_name }}
-              {% endif %}
-            </td>
-            <td>${{ item.unit_price|intcomma }}</td>
-            <td>{{ item.quantity }}</td>
-            <td class="text-right font-semibold">${{ item.line_total|intcomma }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="mt-6">
+    {% include "orders/partials/_order_lines.html" %}
   </div>
 
   <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -79,8 +51,7 @@
           <button type="submit" class="btn btn-primary">Update</button>
         </form>
         <div class="mt-4 text-right">
-          <p class="text-sm uppercase tracking-wide opacity-60">Order total</p>
-          <p class="text-2xl font-bold text-primary">${{ order.total|intcomma }}</p>
+          {% include "orders/partials/_order_total.html" with staff=True %}
         </div>
       </div>
     </div>
