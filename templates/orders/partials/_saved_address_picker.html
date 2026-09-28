@@ -1,0 +1,13 @@
+{# The "Use a saved address" dropdown above one checkout address section. #}
+{# Choosing an address swaps that section's fields, filled in, via HTMX. #}
+{% if saved_addresses %}
+  <select class="select w-full" name="address" aria-label="Use a saved {{ kind }} address"
+          hx-get="{% url 'orders:checkout_address' kind %}"
+          hx-target="#{{ kind }}-fields"
+          hx-trigger="change">
+    <option value="" disabled {% if not default_pk %}selected{% endif %}>Use a saved address…</option>
+    {% for address in saved_addresses %}
+      <option value="{{ address.pk }}" {% if address.pk == default_pk %}selected{% endif %}>{{ address }}</option>
+    {% endfor %}
+  </select>
+{% endif %}

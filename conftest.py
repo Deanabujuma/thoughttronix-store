@@ -9,6 +9,7 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 
+from accounts.models import Address
 from orders.models import Cart, CartItem
 from products.models import Category, Product, Tag
 
@@ -27,6 +28,20 @@ def staff_user(db):
         password="employee123",
         is_staff=True,
         job_title="Junior Thought Curator",
+    )
+
+
+@pytest.fixture
+def address(customer):
+    """The customer's first saved address — so both of their defaults."""
+    return Address.objects.create(
+        user=customer,
+        label="Home",
+        name="Casey Monroe",
+        street="214 Synapse Street",
+        city="Canyon",
+        state="TX",
+        zip_code="79015",
     )
 
 

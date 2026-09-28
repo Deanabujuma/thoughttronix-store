@@ -9,12 +9,14 @@ validate the form, hand everything to ``place_order``.
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 
 from accounts.mixins import StaffRequiredMixin
+from accounts.models import Address
 from products.models import Product
 
 from .forms import CheckoutForm, OrderStatusForm
@@ -85,6 +87,9 @@ class RemoveCartItemView(CartItemActionView):
         item.delete()
 
 
+ADDRESS_KINDS = ("shipping", "billing")
+
+
 class CheckoutView(LoginRequiredMixin, FormView):
     """The single checkout page: validate the form, hand off to the service.
 
@@ -116,16 +121,59 @@ class CheckoutView(LoginRequiredMixin, FormView):
             return redirect("orders:cart")
         return super().dispatch(request, *args, **kwargs)
 
+    def get_initial(self):
+        """Open with each address section filled from its default."""
+        initial = super().get_initial()
+        addresses = self.request.user.addresses
+        for prefix in ADDRESS_KINDS:
+            default = addresses.filter(**{f"is_default_{prefix}": True}).first()
+            if default:
+                initial.update(default.as_checkout_initial(prefix))
+        return initial
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cart"] = Cart.for_user(self.request.user)
+        saved = list(self.request.user.addresses.all())
+        context["saved_addresses"] = saved
+        for prefix in ADDRESS_KINDS:
+            context[f"default_{prefix}_pk"] = next(
+                (a.pk for a in saved if getattr(a, f"is_default_{prefix}")), None
+            )
         return context
 
     def form_valid(self, form):
         cart = Cart.for_user(self.request.user)
         order = place_order(cart, self.request.user, form.cleaned_data)
+        # Saving is a convenience on top of the order, never part of it:
+        # the order already holds its own copy of both addresses.
+        for prefix in ADDRESS_KINDS:
+            if form.cleaned_data[f"save_{prefix}"]:
+                Address.objects.save_from_checkout(
+                    self.request.user, form.cleaned_data, prefix
+                )
         messages.success(self.request, f"Order {order.number} placed. Thank you!")
         return redirect(reverse("orders:confirmation", kwargs={"pk": order.pk}))
+
+
+class CheckoutAddressView(LoginRequiredMixin, View):
+    """HTMX: one checkout address section, filled from a saved address.
+
+    The fields come back as ordinary, editable form fields, so checkout
+    still posts and validates exactly as if they had been typed.
+    """
+
+    def get(self, request, kind):
+        address_pk = request.GET.get("address", "")
+        if kind not in ADDRESS_KINDS or not address_pk.isdigit():
+            raise Http404
+        address = get_object_or_404(Address, pk=address_pk, user=request.user)
+        form = CheckoutForm(initial=address.as_checkout_initial(kind))
+        return render(
+            request,
+            "orders/partials/_address_fields.html",
+            {"fields": getattr(form, f"{kind}_fields")()},
+        )
 
 
 class OwnOrdersMixin(LoginRequiredMixin):

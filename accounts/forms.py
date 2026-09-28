@@ -1,6 +1,7 @@
+from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
-from .models import User
+from .models import Address, User
 
 
 class SignupForm(UserCreationForm):
@@ -26,3 +27,23 @@ class SignInForm(AuthenticationForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs["class"] = "input w-full"
+
+
+class AddressForm(forms.ModelForm):
+    """Add or edit a saved address; the model's fields carry every rule.
+
+    The defaults are left out — they change through their own buttons on
+    the address book, never by editing an address.
+    """
+
+    class Meta:
+        model = Address
+        fields = ["label", "name", "street", "line2", "city", "state", "zip_code"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(field.widget, forms.Select):
+                field.widget.attrs["class"] = "select w-full"
+            else:
+                field.widget.attrs["class"] = "input w-full"
