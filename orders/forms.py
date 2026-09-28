@@ -94,6 +94,10 @@ class CouponForm(forms.Form):
     Blank means no discount. A valid form leaves the redeemed ``Coupon``
     on ``self.coupon``; ``place_order`` redeems the code again as the
     backstop.
+
+    ``applied_coupon_code`` carries the code the checkout last previewed,
+    so a code typed over it but never applied can be caught before it
+    changes the total the customer saw.
     """
 
     coupon_code = forms.CharField(
@@ -101,6 +105,9 @@ class CouponForm(forms.Form):
         max_length=30,
         required=False,
         widget=forms.TextInput(attrs={"class": "input w-full uppercase"}),
+    )
+    applied_coupon_code = forms.CharField(
+        max_length=30, required=False, widget=forms.HiddenInput
     )
 
     def __init__(self, *args, cart, **kwargs):
@@ -117,6 +124,12 @@ class CouponForm(forms.Form):
         except InvalidCouponError as error:
             raise forms.ValidationError(str(error)) from None
         return self.coupon.code
+
+    def differs_from_preview(self):
+        """Whether the submitted code isn't the one the checkout previewed."""
+        submitted = Coupon.normalize_code(self.data.get("coupon_code", ""))
+        applied = Coupon.normalize_code(self.data.get("applied_coupon_code", ""))
+        return submitted != applied
 
 
 class ManageCouponForm(StyledModelForm):

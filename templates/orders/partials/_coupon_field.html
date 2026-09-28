@@ -1,28 +1,28 @@
 {# The checkout's discount-code control. Apply and Remove post just the code #}
 {# to the preview endpoint, which returns this partial again plus the order #}
-{# summary and place-order button out-of-band. An applied code is read-only #}
-{# until removed, so the preview always matches what the form will submit. #}
+{# summary and place-order button out-of-band. The field stays editable: #}
+{# Apply over an applied code replaces it. The hidden applied code is what #}
+{# the preview priced, so checkout can refuse a code typed but not applied. #}
 {% with coupon=coupon_form.coupon %}
   <div id="coupon-field">
     <label class="label mb-1" for="id_coupon_code">Discount code</label>
+    <input type="hidden" name="applied_coupon_code" value="{{ coupon.code|default:'' }}">
     <div class="join w-full">
+      <input type="text" name="coupon_code" id="id_coupon_code" maxlength="30"
+             value="{{ coupon.code|default:'' }}"
+             class="input join-item w-full uppercase" placeholder="e.g. THOUGHTS10">
+      <button type="button" class="btn btn-secondary join-item"
+              hx-post="{% url 'orders:checkout_coupon' %}"
+              hx-params="coupon_code"
+              hx-target="#coupon-field"
+              hx-swap="outerHTML">Apply</button>
       {% if coupon %}
-        <input type="text" name="coupon_code" id="id_coupon_code" value="{{ coupon.code }}"
-               readonly class="input join-item w-full uppercase">
         <button type="button" class="btn join-item"
                 hx-post="{% url 'orders:checkout_coupon' %}"
                 hx-params="coupon_code"
                 hx-vals='{"coupon_code": ""}'
                 hx-target="#coupon-field"
                 hx-swap="outerHTML">Remove</button>
-      {% else %}
-        <input type="text" name="coupon_code" id="id_coupon_code" maxlength="30"
-               class="input join-item w-full uppercase" placeholder="e.g. THOUGHTS10">
-        <button type="button" class="btn btn-secondary join-item"
-                hx-post="{% url 'orders:checkout_coupon' %}"
-                hx-params="coupon_code"
-                hx-target="#coupon-field"
-                hx-swap="outerHTML">Apply</button>
       {% endif %}
     </div>
     {% if coupon %}

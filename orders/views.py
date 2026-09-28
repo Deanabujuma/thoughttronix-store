@@ -109,7 +109,9 @@ class CheckoutView(LoginRequiredMixin, FormView):
     backstop, and a backstop failure sends the customer to the cart too.
 
     The discount code posts with the checkout but validates in its own
-    ``CouponForm``; both forms must pass before an order is placed.
+    ``CouponForm``; both forms must pass before an order is placed, and
+    the code must be the one last previewed — a code typed over it but
+    never applied re-prices the page instead of placing the order.
     """
 
     template_name = "orders/checkout.html"
@@ -143,6 +145,15 @@ class CheckoutView(LoginRequiredMixin, FormView):
         coupon_form = self.get_coupon_form()
         # Validate both, so every error shows at once.
         if all([form.is_valid(), coupon_form.is_valid()]):
+            if coupon_form.differs_from_preview():
+                # A code typed but never applied: re-price, don't charge a
+                # total the customer hasn't seen.
+                messages.info(
+                    request,
+                    "Your discount changed — check the new total, "
+                    "then place your order.",
+                )
+                return self.form_invalid(form, coupon_form)
             return self.form_valid(form, coupon_form)
         return self.form_invalid(form, coupon_form)
 
@@ -228,8 +239,9 @@ class CheckoutCouponView(LoginRequiredMixin, View):
 
     Nothing is saved — the code lives only in the checkout form, and
     ``place_order`` redeems it again on submit. Returns the code control
-    plus the order summary and place-order button out-of-band. A failed
-    Apply leaves no code applied; a blank code is a Remove.
+    plus the order summary and place-order button out-of-band. Applying
+    over an applied code replaces it; a failed Apply leaves no code
+    applied, so the old discount goes too; a blank code is a Remove.
     """
 
     http_method_names = ["post"]

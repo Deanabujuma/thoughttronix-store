@@ -41,7 +41,9 @@ def test_applying_a_code_previews_the_discounted_order(
     page = response.content.decode()
     assert response.status_code == HTTPStatus.OK
     assert "THOUGHTS10 applied — 10% off your order." in page
-    assert 'value="THOUGHTS10"' in page and "readonly" in page
+    assert 'value="THOUGHTS10"' in page and "readonly" not in page
+    assert 'name="applied_coupon_code" value="THOUGHTS10"' in page
+    assert "Apply" in page and "Remove" in page  # replace it, or take it off
     assert "−$70.00 with THOUGHTS10" in page  # the line
     assert "Discount (THOUGHTS10, 10%)" in page  # the summary
     assert "Place order — $629.98" in page  # the button
@@ -69,8 +71,8 @@ def test_a_failed_apply_shows_the_error_and_keeps_no_code(
 
     page = response.content.decode()
     assert "SUMMER20 expired on" in page
-    assert "readonly" not in page  # the field is back to empty and editable
-    assert 'value="SUMMER20"' not in page
+    assert 'value="SUMMER20"' not in page  # the field is back to empty
+    assert 'name="applied_coupon_code" value=""' in page
     assert "Place order — $699.98" in page
 
 
@@ -97,6 +99,40 @@ def test_remove_clears_the_code_without_an_error(
     assert "text-error" not in page
     assert "Apply" in page
     assert "Place order — $699.98" in page
+
+
+def test_applying_over_an_applied_code_replaces_it(
+    client, customer, cart_item, whole_order_coupon, product_coupon
+):
+    client.force_login(customer)
+
+    response = client.post(
+        PREVIEW, {"coupon_code": "HUB15", "applied_coupon_code": "THOUGHTS10"}
+    )
+
+    page = response.content.decode()
+    assert "HUB15 applied — 15% off selected products." in page
+    assert 'name="applied_coupon_code" value="HUB15"' in page
+    assert "THOUGHTS10 applied" not in page
+    assert "Place order — $594.98" in page
+
+
+def test_replacing_with_a_bad_code_drops_the_old_discount(
+    client, customer, cart_item, whole_order_coupon, expired_coupon
+):
+    client.force_login(customer)
+
+    response = client.post(
+        PREVIEW, {"coupon_code": "SUMMER20", "applied_coupon_code": "THOUGHTS10"}
+    )
+
+    page = response.content.decode()
+    assert "SUMMER20 expired on" in page
+    assert "THOUGHTS10 applied" not in page
+    assert "Discount (THOUGHTS10" not in page  # gone from the summary too
+    assert 'name="applied_coupon_code" value=""' in page
+    assert "Place order — $699.98" in page
+    assert response.context["pricing"].total == Decimal("699.98")
 
 
 # --- The full checkout page ---------------------------------------------------------
@@ -127,3 +163,57 @@ def test_a_rerendered_checkout_keeps_a_valid_code_applied(
     assert "THOUGHTS10 applied" in page
     assert "Place order — $629.98" in page
     assert response.context["pricing"].total == Decimal("629.98")
+
+
+def test_a_code_typed_over_but_never_applied_places_nothing(
+    client, customer, cart_item, whole_order_coupon, product_coupon
+):
+    """Submitting a new code without Apply re-prices; it never charges blind."""
+    client.force_login(customer)
+
+    response = client.post(
+        reverse("orders:checkout"),
+        {**VALID_DATA, "coupon_code": "HUB15", "applied_coupon_code": "THOUGHTS10"},
+    )
+
+    page = response.content.decode()
+    assert response.status_code == HTTPStatus.OK
+    assert not Order.objects.exists()
+    assert "Your discount changed" in page
+    assert "HUB15 applied" in page
+    assert 'name="applied_coupon_code" value="HUB15"' in page
+    assert "Place order — $594.98" in page
+
+
+def test_a_bad_code_typed_over_an_applied_one_clears_the_discount(
+    client, customer, cart_item, whole_order_coupon, expired_coupon
+):
+    client.force_login(customer)
+
+    response = client.post(
+        reverse("orders:checkout"),
+        {**VALID_DATA, "coupon_code": "SUMMER20", "applied_coupon_code": "THOUGHTS10"},
+    )
+
+    assert not Order.objects.exists()
+    assert (
+        response.context["coupon_form"]
+        .errors["coupon_code"][0]
+        .startswith("SUMMER20 expired on")
+    )
+    assert response.context["pricing"].total == Decimal("699.98")
+    assert "Place order — $699.98" in response.content.decode()
+
+
+def test_the_previewed_code_places_the_order(
+    client, customer, cart_item, product_coupon
+):
+    client.force_login(customer)
+
+    response = client.post(
+        reverse("orders:checkout"),
+        {**VALID_DATA, "coupon_code": "HUB15", "applied_coupon_code": "HUB15"},
+    )
+
+    assert response.status_code == HTTPStatus.FOUND
+    assert Order.objects.get().total == Decimal("594.98")

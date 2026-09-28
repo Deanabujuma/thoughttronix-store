@@ -153,7 +153,12 @@ def test_checkout_with_a_code_places_a_discounted_order(
     client.force_login(customer)
 
     response = client.post(
-        reverse("orders:checkout"), {**VALID_DATA, "coupon_code": "thoughts10"}
+        reverse("orders:checkout"),
+        {
+            **VALID_DATA,
+            "coupon_code": "thoughts10",
+            "applied_coupon_code": "THOUGHTS10",
+        },
     )
 
     order = Order.objects.get()
@@ -189,7 +194,12 @@ def test_a_code_that_fails_the_backstop_lands_beside_the_field(
     client.force_login(customer)
 
     response = client.post(
-        reverse("orders:checkout"), {**VALID_DATA, "coupon_code": "THOUGHTS10"}
+        reverse("orders:checkout"),
+        {
+            **VALID_DATA,
+            "coupon_code": "THOUGHTS10",
+            "applied_coupon_code": "THOUGHTS10",
+        },
     )
 
     assert response.status_code == HTTPStatus.OK
