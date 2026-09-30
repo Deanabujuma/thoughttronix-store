@@ -10,7 +10,8 @@ A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platfo
   (destructive, idempotent)
 - `uv run python manage.py tailwind runserver` — dev server + Tailwind watch
 - `uv run python manage.py tailwind build` — compile production CSS
-- `uv run pytest` — run the test suite
+- `uv run pytest` — run the test suite. The suite must be green at every
+  phase boundary.
 - `uv run ruff check .` and `uv run ruff format .` — lint and format
 
 ## Project layout
@@ -46,17 +47,8 @@ via environs with working defaults — the app must run with no `.env` present.
 
 ## Template conventions
 
-- Every page extends the project-level `templates/base.html` (DaisyUI navbar,
-  footer motto). DaisyUI theme: `night`, set in `assets/css/source.css` and
-  `data-theme` on `<html>`.
-- Back-office pages extend `templates/backoffice/base.html` — the staff shell
-  with the tab rail; the active tab comes from the view's `section` context
-  entry.
-- HTMX endpoints render partials from `templates/<app>/partials/_<name>.html` —
-  prefixed with an underscore, never extending `base.html`.
-- Every list view gets a designed empty state, not a blank page.
-- Styling is Tailwind + DaisyUI classes only; no crispy-forms, no JavaScript
-  beyond HTMX.
+When working on templates, partials, HTMX endpoints, or styling, read
+`docs/TEMPLATES.md` for template conventions.
 
 ## URL conventions
 
@@ -68,6 +60,5 @@ via environs with working defaults — the app must run with no `.env` present.
 
 ## Testing
 
-pytest + pytest-django. Shared fixtures live in the project-level
-`conftest.py` — plain fixtures, no factory-boy. Tests never invoke the seed
-command. The suite must be green at every phase boundary.
+When writing or changing tests, read `docs/TESTING.md` for testing
+conventions.
