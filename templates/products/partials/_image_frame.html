@@ -1,0 +1,7 @@
+{# A product's card image (or its placeholder) in the fixed 4:5 frame. #}
+{# Pass `image` (a DisplayImage) and optionally `frame_class` for sizing. #}
+{# The border shows the frame's edge: letterboxing is otherwise invisible on the dark theme. #}
+{# The image is positioned out of flow, so its natural size can never resize the frame. #}
+<div class="relative aspect-[4/5] overflow-hidden border border-base-content/15 bg-base-300 {{ frame_class }}">
+  <img src="{{ image.url }}" alt="{{ image.alt }}" loading="lazy" class="absolute inset-0 h-full w-full object-contain" />
+</div>

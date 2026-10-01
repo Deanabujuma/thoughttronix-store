@@ -138,12 +138,23 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "assets"]
 
 
+# Uploaded media (product images). Django serves these only while DEBUG is
+# True; production needs its own media serving.
+
+MEDIA_URL = "/media/"
+
+MEDIA_ROOT = BASE_DIR / "media"
+
+
 # Tailwind CSS + DaisyUI (django-tailwind-cli, standalone binary — no Node.js)
 
-TAILWIND_CLI_USE_DAISY_UI = True
+# The official Tailwind Labs CLI, not the DaisyUI-bundling tailwind-cli-extra
+# fork: Windows Smart App Control blocks the fork's unsigned binary. DaisyUI
+# loads as a plugin file instead (assets/css/daisyui.mjs, pinned to v5.7.47).
+TAILWIND_CLI_USE_DAISY_UI = False
 
-# Pinned tailwind-cli-extra release (bundles Tailwind CSS + DaisyUI).
-TAILWIND_CLI_VERSION = "2.9.2"
+# Pinned official Tailwind CSS release.
+TAILWIND_CLI_VERSION = "4.3.2"
 
 TAILWIND_CLI_SRC_CSS = "assets/css/source.css"
 

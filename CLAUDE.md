@@ -1,6 +1,6 @@
 # CLAUDE.md — The ThoughtTronix Store
 
-A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platform.md`) and the plan (`plans/core-platform.md`) record how the core platform was designed and built; `prd/discount-codes.md` and `plans/discount-codes.md` do the same for discount codes.
+A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platform.md`) and the plan (`plans/core-platform.md`) record how the core platform was designed and built; `prd/discount-codes.md` and `plans/discount-codes.md` do the same for discount codes; `prd/product-images.md` and `plans/product-images.md` for product images.
 
 ## Commands
 
@@ -36,10 +36,11 @@ A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platfo
 Logic lives in models and managers; cross-model workflows get a service
 module; views stay thin.
 
-Exactly two deliberate deep modules, docstrings and type hints on every
+Exactly three deliberate deep modules, docstrings and type hints on every
 public function: `orders/services.py` (`place_order`, which redeems the
-`coupon_code` and snapshots the discount) and `dashboard/queries.py` (the
-dashboard's aggregations).
+`coupon_code` and snapshots the discount), `dashboard/queries.py` (the
+dashboard's aggregations), and `products/images.py` (product-image
+validation, display copies, and file cleanup).
 
 Idiomatic Django throughout: class-based views, model methods, custom
 managers/querysets, forms own their validation. Settings read from `.env`

@@ -1,0 +1,33 @@
+{# The product image: current preview, the upload, and Remove image. #}
+{% with upload=form.image remove=form.remove_image product=form.instance reselect_note=form.reselect_note %}
+  <div>
+    <label class="label mb-1" for="{{ upload.id_for_label }}">{{ upload.label }}</label>
+    <div class="flex flex-wrap items-start gap-4">
+      {% if product.pk %}
+        <div class="w-32 shrink-0">
+          {% include "products/partials/_image_frame.html" with image=product.card_image frame_class="rounded-box" %}
+          <p class="mt-1 text-xs opacity-60">
+            {% if product.card_image.is_placeholder %}No image; showing the category placeholder{% else %}Current image{% endif %}
+          </p>
+        </div>
+      {% endif %}
+      <div class="min-w-0 flex-1 space-y-3">
+        {{ upload }}
+        <p class="text-xs opacity-60">{{ upload.help_text }}</p>
+        {% if product.image %}
+          <label class="label cursor-pointer justify-start gap-3" for="{{ remove.id_for_label }}">
+            {{ remove }}
+            <span>{{ remove.label }}</span>
+          </label>
+        {% endif %}
+      </div>
+    </div>
+    {% for error in upload.errors %}
+      <p class="mt-1 text-sm text-error">{{ error }}</p>
+    {% empty %}
+      {% if form.errors and upload.data %}
+        <p class="mt-1 text-sm text-warning">{{ reselect_note }}</p>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endwith %}

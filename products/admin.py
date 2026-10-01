@@ -23,3 +23,6 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ("category", "is_available", "tags")
     search_fields = ("name", "description")
     prepopulated_fields = {"slug": ("name",)}
+    # Images are uploaded through the back office, which validates them and
+    # builds the display copies; the admin only shows what is there.
+    readonly_fields = ("image", "image_width", "image_height")

@@ -226,6 +226,11 @@ def test_catalog_paginates_at_twelve(client, category):
 # --- The seed command -------------------------------------------------------
 
 
+def test_uploads_go_to_a_temporary_media_root(settings, tmp_path):
+    """The autouse fixture keeps every test — seed included — out of media/."""
+    assert settings.MEDIA_ROOT == tmp_path / "media"
+
+
 def test_seed_builds_the_demo_world(db):
     call_command("seed")
 

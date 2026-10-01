@@ -9,6 +9,7 @@ __pycache__/
 # Django
 db.sqlite3
 staticfiles/
+media/
 
 # Tailwind (downloaded CLI binary and compiled CSS)
 .django_tailwind_cli/
@@ -17,3 +18,9 @@ assets/css/tailwind.css
 # Tool caches
 .pytest_cache/
 .ruff_cache/
+
+# Temporary source images for import_product_images (never committed)
+product-images/
+
+# Agent session handoff notes (never committed)
+HANDOFF.md

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
-@plugin "daisyui" {
+/* DaisyUI's official single-file plugin for the standalone Tailwind CLI,
+   pinned to v5.7.47 (vendored beside this file). It is excluded from class
+   scanning: it names every DaisyUI class, and scanning it would generate
+   them all. */
+@source not "./daisyui.mjs";
+@plugin "./daisyui.mjs" {
   themes: night --default;
 }
