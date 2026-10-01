@@ -1,5 +1,65 @@
 # Reflection
 
+## Product Images
+
+### Question 1 — Interview decision
+
+During the grill-me interview, Claude recommended importing the supplied images through the seed command. I chose a separate `import_product_images` command because I wanted to attach images without resetting the demo database. This kept importing images separate from recreating products. The command skips products that already have an image unless I use `--replace`.
+
+### Question 2 — Upload code
+
+The image field is in `products/models.py`, line 101:
+
+```python
+image = models.ImageField(max_length=200, blank=True)
+```
+
+`blank=True` allows a product to have no uploaded image, so it can use its category placeholder. This field does not specify `upload_to`. Normally, `upload_to` determines the upload path within media storage. In my implementation, `save_image()` in `products/images.py` builds a separate folder for each upload, using `products/<random-id>/`.
+
+The opening upload form tag is in `templates/products/manage_product_form.html`, line 13:
+
+```html
+<form method="post" enctype="multipart/form-data" class="mt-2 space-y-4">
+```
+
+`enctype="multipart/form-data"` allows the browser to send the image file along with the other form fields. Django receives uploaded files through `request.FILES`.
+
+### Question 3 — Following Lucent’s image
+
+I created Lucent through the back-office product form and uploaded its headband image.
+
+The original image is stored on disk at:
+
+```text
+C:\Users\deana\cidm3312\thoughttronix-store\media\products\ce78b0f89de240538a46829add3bae46\original.png
+```
+
+`MEDIA_ROOT = BASE_DIR / "media"` in `config/settings.py`, line 146, determines the main storage directory. The code in `products/images.py` creates the product’s random folder and filenames.
+
+The value stored in the database’s Product image field is:
+
+```text
+products/ce78b0f89de240538a46829add3bae46/original.png
+```
+
+The database stores a relative file path rather than the image itself.
+
+The browser requests this image on Lucent’s detail page:
+
+```text
+http://127.0.0.1:8000/media/products/ce78b0f89de240538a46829add3bae46/detail.webp
+```
+
+`MEDIA_URL = "/media/"` in `config/settings.py`, line 144, supplies the URL prefix. The detail page uses the processed `detail.webp` copy instead of the original PNG. The catalog uses `card.webp`.
+
+In `config/urls.py`, line 25, this code connects media URLs to the files on disk:
+
+```python
+static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+During development, Django serves files from `MEDIA_ROOT` through these URLs. This helper adds no media routes when `DEBUG` is False, so production needs separate media serving.
+
 ## Discount Coupons
 
 ### Question 1
