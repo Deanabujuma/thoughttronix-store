@@ -4,6 +4,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models, transaction
+from django.db.models.functions import Lower
 
 from .validators import US_STATES, zip_validator
 
@@ -13,10 +14,31 @@ class User(AbstractUser):
 
     Roles use Django's own vocabulary and nothing else: customers are
     plain users, employees are ``is_staff``, the admin is ``is_superuser``.
+
+    Email stays optional on the model, so staff and admin accounts without
+    one remain valid; signup is what requires it. A non-blank email is
+    stored lowercase and belongs to one account only, in any capitalization.
     """
 
     # Nullable per the PRD: an absent job title is unknown, not empty.
     job_title = models.CharField(max_length=150, null=True, blank=True)  # noqa: DJ001
+
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            # Blank emails are left out, so any number of accounts can
+            # have none — the same conditional pattern as Address.
+            models.UniqueConstraint(
+                Lower("email"),
+                condition=~models.Q(email=""),
+                name="unique_lowercase_email",
+                violation_error_message="A user with that email address already exists.",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        """Lowercase the email on every save — signup, admin, shell, seed."""
+        self.email = self.email.lower()
+        super().save(*args, **kwargs)
 
 
 # Address field → the suffix of its checkout field (``shipping_zip`` etc.).

@@ -5,19 +5,33 @@ from .models import Address, User
 
 
 class SignupForm(UserCreationForm):
-    """Django's stock signup fields — username plus password and confirmation.
+    """Django's stock signup fields plus a required email.
 
-    No email: signing up asks for the minimum. The widgets carry DaisyUI
-    classes because plain Django forms own their own styling here.
+    Username, email, password, confirmation — in that order. Email is how
+    an account is recovered, so it must be unique in any capitalization.
+    The widgets carry DaisyUI classes because plain Django forms own their
+    own styling here.
     """
 
     class Meta(UserCreationForm.Meta):
         model = User
+        fields = ("username", "email")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["email"].required = True
         for field in self.fields.values():
             field.widget.attrs["class"] = "input w-full"
+
+    def clean_email(self) -> str:
+        """Lowercase the email and reject one another account already uses."""
+        email = self.cleaned_data["email"].lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(
+                "A user with that email address already exists.",
+                code="duplicate_email",
+            )
+        return email
 
 
 class SignInForm(AuthenticationForm):

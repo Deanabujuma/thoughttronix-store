@@ -1,6 +1,6 @@
 # CLAUDE.md — The ThoughtTronix Store
 
-A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platform.md`) and the plan (`plans/core-platform.md`) record how the core platform was designed and built; `prd/discount-codes.md` and `plans/discount-codes.md` do the same for discount codes; `prd/product-images.md` and `plans/product-images.md` for product images.
+A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platform.md`) and the plan (`plans/core-platform.md`) record how the core platform was designed and built; `prd/discount-codes.md` and `plans/discount-codes.md` do the same for discount codes; `prd/product-images.md` and `plans/product-images.md` for product images; `prd/account-security.md` and `plans/account-security.md` for the account security center.
 
 ## Commands
 
@@ -18,7 +18,9 @@ A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platfo
 
 - `config/` — the project package (settings, root urls)
 - `accounts/` — custom user model (`accounts.User`, `AbstractUser` + nullable
-  `job_title`). Roles are Django's own vocabulary: customers are plain users,
+  `job_title`). Email is required at signup, stored lowercase on every save,
+  and unique case-insensitively (blank emails allowed for staff/admin); login
+  stays username-only. Roles are Django's own vocabulary: customers are plain users,
   employees are `is_staff`, the admin is `is_superuser`. No role field, no Groups.
 - `products/` — catalog (`Category`, `Product`, `Tag`), its back-office CRUD,
   and the `seed` command

@@ -28,6 +28,528 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-08 — Account Security Center Phase 1: email identity at signup
+
+### Prompts
+The session began after `/clear`. It spans two transcripts: prompt 1 is in
+the first, and prompts 2–4 are in the second, which opened with "resume".
+Prompt text is verbatim.
+
+1. @prd/account-security.md @plans/account-security.md Implement Phase 1
+   only: Email identity at signup.
+
+   Follow the PRD and the approved tracer-bullet plan exactly. Do not
+   implement later phases.
+
+   Before making changes, review the existing authentication code and
+   relevant migrations.
+
+   After implementation, run the automated tests and Ruff checks, verify
+   the Phase 1 acceptance criteria, and explain how I can manually test the
+   feature in my browser.
+
+   Do not commit the changes yet. I want to review and verify Phase 1
+   myself first.
+2. resume
+3. My manual signup and duplicate-email tests passed. Please verify that my
+   new account's email was saved in lowercase and review the final Phase 1
+   acceptance criteria.
+
+   Check git status and identify which files should be included in the
+   Phase 1 commit. Do not modify or restore db.sqlite3, and do not commit
+   anything yet.
+4. Append a Phase 1 implementation session log to PROMPTS.md under today's
+   date, October 8, 2026, with the newest entry at the top.
+
+   Record every prompt I gave you during this implementation session, in
+   order, including corrections and follow-up requests.
+
+   Summarize the implementation, automated verification, manual signup
+   testing, duplicate-email rejection, and confirmation that the email was
+   saved in lowercase.
+
+   Do not modify or commit any other files yet.
+
+### Summary
+- **Outcome:** Phase 1 of `plans/account-security.md` is built and not
+  committed. Nothing from Phases 2–7 was added.
+  - **Implementation:**
+    - `User.save()` lowercases the email on every save, so signup, the admin,
+      the shell, `create_user`, and `seed` all store it the same way.
+    - A conditional `UniqueConstraint(Lower("email"), condition=~Q(email=""))`
+      makes emails unique in any capitalization while allowing any number of
+      blank emails. Its `violation_error_message` makes the admin show a
+      friendly error instead of crashing on a duplicate.
+    - Hand-written data migration `0003_lowercase_emails` lowercases existing
+      emails. If it finds case-insensitive duplicates, it stops with a
+      `RuntimeError` naming each address and its usernames.
+      `0004_unique_lowercase_email` adds the constraint only after that.
+    - `SignupForm` asks for username, email, password, and confirmation, in
+      that order, with email required. `clean_email` lowercases the address
+      and puts "A user with that email address already exists." on the email
+      field for a duplicate in any capitalization.
+    - `CLAUDE.md` points to the new PRD and plan and describes the email
+      rules.
+  - **Automated verification:** 15 new tests in
+    `accounts/test_email_identity.py` cover:
+    - signup field order, required email, and lowercasing
+    - duplicate rejection in two capitalizations
+    - the database constraint (using `bulk_create`, which skips `save()`)
+    - several blank emails
+    - lowercasing and duplicate rejection in the admin and `create_user`
+    - sign-in for staff without an email
+    - `seed`
+    - both migration paths, run from `0002` forward
+
+    The two existing signup tests in `accounts/tests.py` now post an email.
+    The full suite passes (343 tests). `ruff check`, `ruff format --check`,
+    and `makemigrations --check` are clean. In the second transcript, the
+    agent re-ran these checks and mapped each of the nine acceptance
+    criteria to its test.
+  - **Manual testing:** the agent did not migrate the committed
+    `db.sqlite3`; it ran both migrations against a scratch copy, where all 13
+    users came through correctly. The developer then migrated `db.sqlite3`
+    and tested in the browser. Signing up as `dana` with a mixed-case email
+    worked. A second signup reusing that email in different capitalization
+    was rejected with the email-field error. The agent confirmed in the
+    database that the new account `dana` is stored with
+    `dana@example.com`, that no account was created by the rejected attempt
+    (14 users, only one `dana*`), and that no user has a mixed-case email.
+  - **Commit scope:**
+    - Recommended for the Phase 1 commit: the `accounts/` model, form, test
+      and migration changes, `CLAUDE.md`, `prd/account-security.md`, and
+      `plans/account-security.md`.
+    - Left to the developer: `PROMPTS.md`, and the two new
+      `.claude/skills/` directories (suggested as a separate commit).
+    - Left out: `db.sqlite3`, changed by the developer's migration and manual
+      signup, is the grading snapshot and was neither modified nor restored
+      by the agent.
+- **Deviations:** None from a recommended answer. Prompt 1 asked for no
+  commit, and prompt 3 asked again for no commit and for `db.sqlite3` not to
+  be modified or restored; both were followed. The developer migrated the
+  database themselves, using the browser-test steps the agent gave.
+- **Sideways:**
+  - No test or lint failures during implementation.
+  - The session was split by "resume", so the second transcript rebuilt
+    state from git and the plan, then re-ran the full suite before reporting.
+  - For this log: the agent read the first transcript to recover prompt 1.
+    Its extraction script hit a Windows `cp1252` encoding error twice. The
+    second retry failed because `python -I` ignores `PYTHONIOENCODING`.
+    Calling `sys.stdout.reconfigure(encoding="utf-8")` in the script fixed it.
+
+## 2026-10-08 — Account Security Center: tracer-bullet plan (no implementation)
+
+### Prompts
+The session began after `/clear`. Prompt text is verbatim.
+
+1. /prd-to-plan @prd/account-security.md
+2. Before creating the final implementation plan, present the proposed
+   tracer-bullet phases and their corresponding user stories. Stop and wait
+   for my explicit approval. Do not implement any code or automatically
+   approve the phase breakdown.
+3. I want changes before approving. Please revise the breakdown as follows:
+
+   1. Email identity at signup — stories 1–7.
+   2. Security overview page — stories 8, 9, 12–14.
+   3. Password reset request and email — the login link, request form,
+      generic confirmation, console reset email, and one-hour expiry.
+   4. Password reset confirmation and completion — valid and expired links,
+      new password submission, redirect to login, and password-changed
+      notification.
+   5. Change password — stories 10 and 21–26.
+   6. Change email — stories 15–20.
+   7. Sign out of all other devices — stories 11 and 37–42.
+
+   Redistribute stories 27–36, 43–44, and 46–47 between Phases 3 and 4
+   based on their actual requirements.
+
+   Incorporate story 45 and all seed, admin, and documentation checks into
+   the phases where those behaviors are introduced. Do not create a
+   separate cleanup phase.
+
+   Ensure every phase has complete, independently verifiable functionality
+   and that all 47 user stories are covered.
+
+   Show me the revised seven-phase breakdown for approval. Do not write the
+   final plan or implement any code yet.
+4. I approve the revised seven-phase breakdown, with one adjustment to
+   Phase 3.
+
+   Please make Phase 3 independently verifiable by including a minimal
+   working destination for the password-reset link rather than leaving an
+   unresolved URL. It should safely recognize the link without allowing a
+   password change yet, and clearly explain that the completion step
+   belongs to Phase 4.
+
+   Phase 4 should then implement the complete password-reset confirmation
+   flow, including password validation, successful completion, expired and
+   used-token handling, session invalidation, and security notification.
+
+   Keep all 47 user stories covered, preserve the seven phases, and include
+   clear acceptance criteria for each phase.
+
+   You may now write the final tracer-bullet implementation plan to
+   plans/account-security.md.
+
+   Do not implement any application code yet.
+5. We have finished comparing the naive plan with the tracer-bullet plan.
+   The tracer-bullet plan provides smaller, independently verifiable
+   phases, integrates testing earlier, and avoids separate preparation and
+   cleanup phases.
+
+   Please delete only the old account-security-draft.md file from the
+   parent directory. Keep prd/account-security.md and
+   plans/account-security.md unchanged. Do not modify any application code.
+6. Append a session log to PROMPTS.md at the repository root under today's
+   date, October 8, 2026, newest entry at the top.
+
+   Record every prompt I gave you during this planning session in
+   chronological order, including my requests to revise the phase
+   breakdown, split password-reset functionality, integrate seed and
+   documentation checks, and add a minimal working reset-link destination.
+
+   End with a short summary explaining the outcome, how the naive and
+   tracer-bullet plans differed, the corrections I requested, and anything
+   that went sideways.
+
+   Do not modify the PRD, implementation plan, or application code.
+
+### Summary
+- **Outcome:** `plans/account-security.md` was written: seven
+  tracer-bullet phases covering all 47 PRD stories, each with
+  "What to build" and acceptance criteria. The phases are email identity,
+  the Security page, the reset request, reset confirmation, change
+  password, change email, and sign out of other devices. A header fixes
+  the URL paths and names, the model and migration decisions, the auth
+  approach, the notification rules, and the settings. The old naive draft,
+  `../account-security-draft.md`, was deleted. The PRD and application
+  code were not touched, and `CLAUDE.md` is not updated yet; the plan
+  assigns that to Phases 1, 3 and 7.
+- **Naive vs tracer-bullet:** The naive draft (written before this
+  session) opened with a "Phase 0 — Prep" for settings and test fixtures
+  and ended with separate seed and docs work, in the style of the earlier
+  feature plans. The tracer-bullet plan has no prep or cleanup phase: each
+  setting, fixture, seed check and `CLAUDE.md` update arrives in the phase
+  whose behavior needs it, and every phase ends with tests that show it
+  working on its own.
+- **Deviations:** My first breakdown had seven phases, with a combined
+  reset phase and a final "Seed, admin and docs" phase. I asked for the
+  reset work to be split into a request phase and a confirm phase, with
+  the stories redistributed between them, and for story 45 and every
+  seed, admin and docs check to move into the phase that introduces the
+  behavior. For the reset link in Phase 3, Claude recommended only
+  registering the confirm URL name so the email could build the link.
+  I instead asked for a minimal holding page that recognizes the link,
+  allows no password change, and is fully replaced in Phase 4.
+- **Sideways:** Claude's first reply already presented the breakdown and
+  waited, so my second prompt got the same breakdown again, now with a
+  story-coverage table. The split I asked for created a real gap: the
+  Phase 3 reset email linked to a confirm page that would not exist until
+  Phase 4. Claude flagged it before writing the plan, and the holding page
+  closed it. The PRD left the exact URL paths and names open, so Claude
+  chose them and asked me to review them before Phase 1. The deleted
+  draft was outside the repo, so the deletion cannot be undone through
+  git; Claude read its opening first to confirm it was the right file.
+  The naive and tracer-bullet plans were compared outside the session;
+  Claude only read the draft's first lines.
+
+## 2026-10-08 — Account Security Center: grill interview and PRD (no implementation)
+
+### Prompts
+Bracketed labels name the question an answer settled; the prompt text is
+verbatim.
+
+1. /grill-me I want to design an Account Security Center for ThoughtTronix.
+   Customers should be required to provide an email address when signing
+   up, be able to change their passwords while signed in, and reset
+   forgotten passwords through email. I also want a dedicated account
+   security page where customers can view and manage their security
+   settings.
+
+   Please interview me to clarify the requirements, recommend one or two
+   additional useful security features, and help me make design decisions.
+   Do not implement anything or create a PRD or plan yet.
+    Copy prompt
+2. [Q1] I choose **Option A**. Email addresses should be required and
+   unique for every customer account, but customers should continue signing
+   in with their usernames.
+
+   I also agree that email uniqueness should be case-insensitive, so
+   addresses with different capitalization are treated as the same email.
+   Normalize email addresses to lowercase when saving them and enforce
+   case-insensitive uniqueness.
+
+   I want to preserve the existing authentication system as much as
+   possible while improving account security. Let's continue to the next
+   design question. Do not implement anything or create the PRD yet.
+3. [Q2] I choose **Option B**. I want email uniqueness enforced through both
+   form validation and a database constraint that excludes blank emails.
+
+   Email addresses should be normalized to lowercase, and uniqueness should
+   be case-insensitive across all account creation and update methods.
+
+   Customer signup must require an email, but existing staff and
+   administrator accounts may have blank emails to preserve compatibility.
+
+   Before implementing the database constraint, check for existing
+   duplicate emails and account for them safely in the migration plan.
+
+   Let's continue to the next design question. Do not implement anything or
+   create the PRD or plan yet.
+4. [Q3] I choose Option A. Let's subclass Django's built-in password
+   management views and use custom templates and DaisyUI-styled forms so
+   the Account Security Center stays consistent with ThoughtTronix.
+
+   I want to use Django's built-in password validation, hashing, password
+   reset tokens, and session security instead of recreating these features.
+
+   Keep all authentication URLs under the existing accounts namespace,
+   preserve the current username-based login system, and provide clear
+   success and error messages for customers.
+
+   Continue with the next design question. Do not implement anything or
+   create the PRD or implementation plan yet.
+5. [Q4] I choose **Option A**. The password-reset process should always
+   display the same confirmation message, regardless of whether the email
+   address is registered.
+
+   Use a message such as: "If an account exists with that email address,
+   we've sent password-reset instructions. Please check your inbox and spam
+   folder."
+
+   I want to prevent account enumeration and protect customer privacy while
+   keeping the implementation consistent with Django's built-in
+   authentication framework.
+
+   For now, let's leave rate limiting as a potential future enhancement
+   rather than adding it to the current scope.
+
+   Continue with the next design question. Do not implement anything or
+   create the PRD or plan yet.
+6. [Q5] I choose **Option B**, with a security notification sent to the
+   customer's previous email address.
+
+   Customers should be able to update their email address from the Account
+   Security Center, but they must enter their current password to authorize
+   the change.
+
+   The new email must be required, normalized to lowercase, and validated
+   for case-insensitive uniqueness.
+
+   After a successful update, display a confirmation message and send a
+   notification to the previous email address informing the customer that
+   their account email was changed. The notification should not contain
+   passwords or other sensitive information.
+
+   Use Django's existing console email backend for development. We can
+   leave email verification with confirmation links as a future
+   enhancement.
+
+   Continue with the next design question. Do not implement anything or
+   create the PRD or plan yet.
+7. [Q6] I choose **Options A and B** as the two additional security
+   features.
+
+   For Option A, send a security notification whenever a customer's
+   password changes, including changes made through the password-change
+   form and successful password resets. The notification should include the
+   date and a link to the password-reset page without exposing sensitive
+   information. Use the existing console email backend.
+
+   For Option B, add a "Sign out of all other devices" button to the
+   Account Security Center. Require the customer's current password before
+   performing the action, terminate their other active sessions, and
+   preserve their current session.
+
+   Please plan this feature using Django's existing session and
+   authentication mechanisms rather than introducing unnecessary
+   dependencies. Include automated tests verifying that other sessions are
+   invalidated while the current one remains active.
+
+   Leave recent sign-in activity and two-factor authentication out of scope
+   for now.
+
+   Continue with the next design question. Do not implement anything or
+   create the PRD or plan yet.
+8. [Q7] I choose **Option A**. Add a per-user session salt to the custom
+   User model and incorporate it into Django's session authentication hash.
+
+   When customers select "Sign out of all other devices," require their
+   current password, generate a new session salt, invalidate other
+   sessions, and preserve the current session using Django's session
+   authentication mechanisms.
+
+   Make sure this works correctly with password changes and resets without
+   modifying the customer's actual password.
+
+   Include automated tests using two separate authenticated sessions to
+   confirm that the current session remains active while the other session
+   is invalidated on its next request.
+
+   Keep the implementation compatible with Django's authentication system
+   and avoid introducing unnecessary dependencies.
+
+   Continue with the next design question. Do not implement anything or
+   create the PRD or implementation plan yet.
+9. [Q8] I choose **Option A**. The Account Security Center should be
+   accessible to every authenticated user, including customers, employees,
+   and administrators.
+
+   Use one consistent security page protected by Django's
+   LoginRequiredMixin. All authenticated users should be able to change
+   their passwords, update their email addresses, and sign out of other
+   devices.
+
+   For staff or administrator accounts without an email address, display a
+   message such as "No email address on file. Add an email address to
+   enable password recovery."
+
+   The Forgot password link should appear on the login page for everyone.
+   If an account does not have an email or the submitted address is not
+   recognized, use the same generic confirmation message to prevent account
+   enumeration.
+
+   Preserve the existing staff and administrator permissions. Accessing the
+   Account Security Center should not change anyone's role or permissions.
+
+   Continue with the next design question. Do not implement anything or
+   create the PRD or plan yet.
+10. [Q9] I choose **Option A**. Create a dedicated Account Security overview
+    page with separate pages for changing email, changing password, and
+    signing out of other devices.
+
+    The overview page should display the customer's current email address,
+    password management option, and device/session security option using
+    DaisyUI cards.
+
+    Each action should open its own form page. After successful completion,
+    redirect the user to the Security overview page and display a clear
+    confirmation message using Django's messages framework.
+
+    Add a "Security" link to the authenticated navbar next to "Addresses."
+    Include a link back to the Security Center after a successful password
+    change, and keep the password-reset email linked directly to the reset
+    flow for signed-out users.
+
+    Follow the existing ThoughtTronix template conventions, extend
+    base.html, and avoid unnecessary JavaScript or HTMX complexity.
+
+    Continue with the next design question. Do not implement anything or
+    create the PRD or plan yet.
+11. [Q10] I choose **Option A**. After a successful password reset,
+    redirect the customer to the login page with a success message such as
+    "Your password has been reset successfully. Please sign in with your new
+    password."
+
+    Do not automatically sign customers in after resetting their passwords.
+    Keep the behavior consistent with ThoughtTronix's existing signup and
+    login process.
+
+    I also agree with setting PASSWORD_RESET_TIMEOUT to 3600 seconds (1
+    hour), configurable through .env using environs, with 3600 as the
+    default.
+
+    The password-reset email should clearly state that the link expires in
+    one hour. Reset links should become invalid after successful use or
+    another password change.
+
+    Continue with the next design question if any requirements remain
+    unresolved. Do not implement anything or create the PRD or plan yet.
+12. [Q11] I choose **Option A**, and I approve all the proposed defaults.
+
+    Security notification emails should be triggered explicitly from the
+    successful self-service password-change, password-reset, and
+    email-change flows.
+
+    Keep the reusable email notification logic in a method on the User
+    model, following the existing project architecture and keeping the
+    views thin. Do not create a new accounts/services.py module.
+
+    Password changes made through the Django admin, shell, or seed command
+    should not trigger notifications.
+
+    I approve plain-text email templates in templates/accounts/emails/,
+    using DEFAULT_FROM_EMAIL configured through .env with the proposed
+    default.
+
+    I also approve the standard Django password-change form, the signup
+    email field positioned between username and password, and the proposed
+    out-of-scope list: rate limiting, email verification, recent sign-in
+    activity, two-factor authentication, and login lockout.
+
+    Make sure notifications are triggered only after successful changes and
+    that accounts without an email address are handled gracefully.
+
+    If there are no more unresolved design questions, summarize our final
+    decisions and confirm that the /grill-me interview is complete. Do not
+    create the PRD or implementation plan yet.
+13. /to-prd
+14. Before moving on, review the entire prd/account-security.md against all
+    11 decisions from our /grill-me interview.
+
+    Verify that every agreed requirement is represented, all user stories
+    are consistent with those decisions, and the Out of Scope section
+    contains the features we intentionally excluded.
+
+    Identify any missing, contradictory, or unapproved requirements. If
+    corrections are necessary, explain them and update the PRD.
+
+    Do not implement anything or create an implementation plan yet.
+15. Please check the final saved version of prd/account-security.md and
+    confirm that the Out of Scope section has no duplicate entries or
+    contradictory requirements. Fix any remaining duplicates.
+
+    Do not implement anything or create an implementation plan yet.
+16. Append a session log to PROMPTS.md at the repo root, under today's
+    date, newest entry at the top. Record every prompt I gave you this
+    session, in order, including any corrections. End the entry with a
+    short summary: the outcome, any places where I deviated from a
+    recommended answer or asked follow-up questions, and anything that went
+    sideways.
+
+### Summary
+- **Outcome:** An 11-question grill interview settled the design, recorded
+  in `prd/account-security.md` (47 user stories):
+  - signup requires an email; it is lowercased on every save and unique
+    regardless of capitalization, enforced by the forms and by a database
+    constraint that skips blank emails (staff and admin may stay blank);
+    login stays username-based
+  - the migration lowercases emails and stops with a list of any
+    duplicates before adding the constraint (the dev database had none)
+  - thin subclasses of Django's password-change and password-reset views
+    under `accounts:`; the forgot-password form always gives the same
+    reply; reset links last one hour (`PASSWORD_RESET_TIMEOUT` from
+    `.env`) and lead to the login page without signing in
+  - email change with the current password and a notice to the old address
+  - two extra features: a password-changed notice, and "Sign out of all
+    other devices" through a per-user `session_salt` mixed into the session
+    hash
+  - one Security overview page for every signed-in user, with a separate
+    page per action and a navbar link
+  - notices are sent only from the three self-service flows, through a
+    `User` method, as plain-text templates; no fourth deep module
+
+  Only the PRD was written. There is no plan or implementation yet, and
+  `CLAUDE.md` does not list the PRD yet; that waits until the plan exists.
+- **Deviations:** Every recommended option was accepted. Additions beyond
+  the recommendations: the duplicate check in the migration (Q2), the exact
+  reset and no-email messages (Q4, Q8), the two-session test requirement
+  (Q6, Q7), and the link back to the Security Center after a password
+  change (Q9). Rate limiting, email verification, sign-in activity and
+  two-factor authentication were explicitly deferred. Follow-ups after the
+  PRD: a review against all 11 decisions, then a check of Out of Scope for
+  duplicates.
+- **Sideways:** The first prompt arrived with a stray "Copy prompt" from
+  the clipboard; it was ignored. The review found four problems in the
+  first PRD draft: "trims" emails (never approved); "no automatic sign-in
+  after signup" (never discussed); a `docs/TESTING.md` path in a section
+  the template keeps free of paths; and an Out of Scope list that mixed
+  explicitly deferred features with exclusions implied by other decisions.
+  All four were fixed. The final check found no duplicates and changed
+  nothing. Writing this log, the first attempt failed because a shell
+  heredoc could not parse the entry; nothing was written, and the entry
+  went in through a scratch file instead.
+
 ## 2026-09-30 — Product images: build, Tailwind fix, browser review, commit
 
 ### Prompts
