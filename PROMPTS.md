@@ -28,6 +28,102 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-08 — Account Security Center Phase 2: security overview page
+
+### Prompts
+The session began after `/clear`. Prompt text is verbatim.
+
+1. I approve the staged files. Please commit Phase 1 with the message
+   "Require a unique lowercase email at signup." Do not include db.sqlite3.
+   Show me the commit hash when finished, and do not start Phase 2 yet.
+2. @prd/account-security.md @plans/account-security.md Implement Phase 2
+   only: Security Overview Page.
+
+   Follow the approved PRD and tracer-bullet implementation plan.
+
+   Create the Account Security overview page using DaisyUI cards, display
+   the current user's email or the no-email notice, and add the Security
+   link to the authenticated navbar next to Addresses.
+
+   Make sure the page requires authentication and works for customers,
+   employees, and administrators.
+
+   Do not implement anything from Phases 3–7.
+
+   After implementation, run the automated tests, Ruff checks, and
+   migration checks. Review Phase 2's acceptance criteria and explain how I
+   can manually verify everything in the browser.
+
+   Do not commit anything yet. I want to review and test Phase 2 myself
+   first. Preserve my modified db.sqlite3 and local test accounts.
+3. Phase 2 manual browser testing is complete. The Security page displays
+   correctly for the employee account, and the authentication redirect
+   works.
+
+   Please append this implementation session to PROMPTS.md under today's
+   date, including every prompt, the implementation summary, automated
+   tests, and manual verification.
+
+   Then review git status, stage only the intended Phase 2 files and
+   PROMPTS.md, and preserve db.sqlite3 and my local test accounts.
+
+   Show me the staged files and test results before committing. Do not
+   commit or begin Phase 3 until I approve.
+
+### Summary
+- **Outcome:** Phase 2 of `plans/account-security.md` is built and staged,
+  and is waiting for the developer's approval before it is committed.
+  Nothing from Phases 3–7 was added.
+  - **Implementation:**
+    - `SecurityView` in `accounts/views.py` is a `LoginRequiredMixin` +
+      `TemplateView` with no role checks. Customers, staff, and the admin
+      all get the same page.
+    - `accounts/urls.py` routes `security/` to `accounts:security`
+      (`/accounts/security/`).
+    - New `templates/accounts/security.html` extends `base.html`. It has one
+      DaisyUI **Email** card that shows the address on file, or, when the
+      email is blank, the exact notice "No email address on file. Add an
+      email address to enable password recovery." in a warning alert.
+    - `templates/base.html` gains a "Security" link right after "Addresses",
+      inside the signed-in block only.
+    - The page has only the Email card. The Password card, the "Change
+      email" button, and the Devices card belong to Phases 5, 6, and 7, so
+      no button links to a page that doesn't exist yet.
+  - **Automated verification:** 10 new tests in `accounts/test_security.py`
+    cover:
+    - a signed-out visitor is redirected to
+      `/accounts/login/?next=/accounts/security/`
+    - a customer, a staff member, and an admin each get a 200 response with
+      `accounts/security.html`
+    - the Email card shows a customer's address and omits the notice
+    - the exact no-email notice for a customer, staff, and an admin with
+      blank emails
+    - the navbar link appears after "Addresses" when signed in and is absent
+      when signed out
+
+    The full suite passes (353 tests). `ruff check`, `ruff format --check`,
+    `makemigrations --check`, `migrate --check`, and `manage.py check` are
+    clean. Phase 2 adds no migrations.
+  - **Manual testing:** the developer tested in the browser. The Security
+    page displayed correctly for the employee account, and visiting it
+    signed out redirected to the login page.
+  - **Commit scope:** staged `accounts/views.py`, `accounts/urls.py`,
+    `accounts/test_security.py`, `templates/accounts/security.html`,
+    `templates/base.html`, and `PROMPTS.md`. `db.sqlite3` (modified by the
+    developer's local test accounts) was left unstaged and untouched; the
+    test suite runs against its own temporary database.
+- **Deviations:** None from a recommended answer. The PRD describes three
+  cards on the finished page; following the plan's phase split, this phase
+  ships only the Email card.
+- **Sideways:**
+  - Prompt 1 asked for the Phase 1 commit, but it already existed as
+    `eb7de87` from before `/clear`, and nothing was staged. The agent made no
+    duplicate commit and reported the existing hash. That commit also
+    includes `PROMPTS.md` and the two `.claude/skills/` files, which the
+    Phase 1 log had suggested committing separately; the agent offered a
+    follow-up split rather than rewriting history.
+  - No test or lint failures during implementation.
+
 ## 2026-10-08 — Account Security Center Phase 1: email identity at signup
 
 ### Prompts
