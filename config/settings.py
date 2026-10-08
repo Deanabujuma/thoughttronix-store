@@ -162,3 +162,11 @@ TAILWIND_CLI_SRC_CSS = "assets/css/source.css"
 # Email — console backend only; real mail is out of scope for the core.
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = env.str(
+    "DEFAULT_FROM_EMAIL",
+    default="ThoughtTronix <no-reply@thoughttronix.example>",
+)
+
+# How long a password-reset link stays valid, in seconds (one hour).
+PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT", default=3600)

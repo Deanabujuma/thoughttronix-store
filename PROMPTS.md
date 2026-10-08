@@ -28,6 +28,153 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-08 — Account Security Center Phase 3: password reset request and email
+
+### Prompts
+The session began after `/clear`. Prompt text is verbatim.
+
+1. @prd/account-security.md @plans/account-security.md Implement Phase 3
+   only: Password Reset Request and Email.
+
+   Follow the approved PRD and tracer-bullet implementation plan.
+
+   Add the "Forgot password?" link to the login page, the password-reset
+   request form, the generic confirmation page, and Django's console-based
+   password-reset email.
+
+   Configure PASSWORD_RESET_TIMEOUT with a default of 3600 seconds and
+   DEFAULT_FROM_EMAIL through environs.
+
+   The reset email should include a one-hour expiration notice and a working
+   link to the minimal holding page specified in Phase 3. The holding page
+   must safely recognize valid and invalid links without allowing password
+   changes yet.
+
+   Protect customer privacy by showing the same confirmation message whether
+   or not an email belongs to an account.
+
+   Use Django's built-in password reset framework and existing DaisyUI
+   styling. Do not implement Phase 4's complete password-reset functionality
+   or any later phases.
+
+   Run pytest, Ruff lint and formatting checks, and Django migration checks.
+   Review each Phase 3 acceptance criterion and explain how I can manually
+   test the request and email flow in the browser.
+
+   Do not commit changes yet. Preserve db.sqlite3 and my existing test
+   accounts. I want to review and verify this phase before committing.
+2. Phase 3 manual testing passed. I verified the Forgot Password form,
+   generic confirmation message, console reset email, valid reset-link
+   holding page, and identical confirmation for an unregistered email.
+
+   Please append this implementation session to PROMPTS.md under today's
+   date, recording every prompt and summarizing the implementation, testing,
+   corrections, and results.
+
+   Run final pytest, Ruff, and migration checks. Review git status and stage
+   only the intended Phase 3 files and PROMPTS.md. Do not stage or modify
+   db.sqlite3.
+
+   Show me the staged file list and test results before committing. Do not
+   start Phase 4 yet.
+
+### Summary
+- **Outcome:** Phase 3 of `plans/account-security.md` is built and staged,
+  and is waiting for the developer's approval before it is committed.
+  Nothing from Phases 4–7 was added.
+  - **Implementation:**
+    - `config/settings.py` reads `DEFAULT_FROM_EMAIL` (default
+      `ThoughtTronix <no-reply@thoughttronix.example>`) and
+      `PASSWORD_RESET_TIMEOUT` (default `3600`) through environs.
+      `EMAIL_BACKEND` stays on the console backend. `.env.example` lists
+      both settings, commented out.
+    - `accounts/forms.py` adds `PasswordResetRequestForm`, which is Django's
+      `PasswordResetForm` with DaisyUI classes. The stock form already
+      matches emails case-insensitively and skips inactive accounts and
+      accounts without a usable password, so no matching logic was added.
+    - `accounts/views.py`:
+      - `PasswordResetRequestView` subclasses Django's `PasswordResetView`
+        and uses the plain-text email and subject templates in
+        `templates/accounts/emails/`. It passes the link lifetime into the
+        email from a small `reset_link_lifetime()` helper (3600 → "one
+        hour"), so the wording stays true if the timeout is changed.
+      - `PasswordResetSentView` subclasses `PasswordResetDoneView`.
+      - `PasswordResetHoldingView` is the temporary page at
+        `accounts:password_reset_confirm`. It is GET-only (a POST gets 405),
+        has no form, uses `never_cache`, and checks the uid and token with
+        `default_token_generator.check_token`, which never uses the link up.
+    - `accounts/urls.py` adds `password-reset/`, `password-reset/sent/`, and
+      `reset/<uidb64>/<token>/`, named as in the plan.
+    - Templates:
+      - a "Forgot password?" link below the sign-in button on `login.html`
+      - new `password_reset_form.html`, `password_reset_done.html` (the
+        exact generic message), and `password_reset_holding.html` ("Reset
+        link recognized", or "Link not valid" with a link to request a new
+        one)
+      - new `emails/password_reset_email.txt` and
+        `emails/password_reset_subject.txt`
+    - `CLAUDE.md` mentions the two new settings.
+  - **Automated verification:** 25 new tests in
+    `accounts/test_password_reset.py` cover:
+    - the login-page link
+    - the redirect to the sent page and its exact message
+    - an identical page for a registered, an unregistered, and a
+      differently capitalized email, with an email-less account present
+    - exactly one email for an active account, including a mixed-case match
+    - no email for unregistered, inactive, unusable-password, or email-less
+      accounts
+    - a plain-text email from `DEFAULT_FROM_EMAIL` that says "expires in
+      one hour", with wording that follows the timeout setting and a link
+      that matches `password_reset_confirm`
+    - the email templates' folder
+    - valid, tampered-token, and unknown-uid holding pages
+    - the link still validating after two visits
+    - a POST returning 405 with the password unchanged
+    - the settings' `.env` values and defaults, by reloading the settings
+      module with `.env` loading turned off
+    - the console email backend
+
+    The full suite passes (378 tests). `ruff check`, `ruff format --check`,
+    `manage.py check`, `makemigrations --check`, and `migrate --check` are
+    clean. Phase 3 adds no migrations.
+  - **Manual testing:** the developer tested in the browser and verified:
+    - the Forgot Password form
+    - the generic confirmation message
+    - the reset email printed on the console
+    - the holding page for a valid reset link
+    - the identical confirmation for an unregistered email
+  - **Commit scope:** staged `.env.example`, `CLAUDE.md`,
+    `config/settings.py`, `accounts/forms.py`, `accounts/views.py`,
+    `accounts/urls.py`, `accounts/test_password_reset.py`,
+    `templates/accounts/login.html`, the three new reset page templates, the
+    two `templates/accounts/emails/` templates, and `PROMPTS.md`.
+    `db.sqlite3` (already modified by the developer's local test accounts)
+    was left unstaged and unmodified. The agent only read it to list users
+    for the manual-test instructions, and the test suite uses its own
+    temporary database.
+- **Deviations:** None from a recommended answer, and no follow-up
+  questions. Prompt 1 asked for a one-hour expiry notice. The agent derived
+  the wording from `PASSWORD_RESET_TIMEOUT` rather than hard-coding "one
+  hour", so it reads "one hour" at the default.
+- **Sideways:**
+  - The first version of the "identical response" test also sent a
+    non-email value and a blank value. Both fail form validation and never
+    reach the generic redirect, so the agent replaced them with an
+    email-less account present alongside the three email cases, plus a
+    separate no-email-sent test.
+  - Comparing the sent pages byte for byte failed because `base.html` puts a
+    CSRF token in `hx-headers`, and Django re-masks it on every render. The
+    test now strips that token before comparing.
+  - The holding-page "no form" check first tried to slice out `<main>`.
+    Signed-out pages have no forms at all (the navbar's logout form is
+    signed-in only), so the check became a plain "no `<form`" assertion.
+  - The reset email says the link "works only once", as the PRD specifies.
+    That only becomes true in Phase 4; the agent pointed this out in its
+    Phase 3 review.
+  - Writing this entry: the first attempt to insert it through an inline
+    shell heredoc failed on quoting, so it was written to a scratch file and
+    inserted from there.
+
 ## 2026-10-08 — Account Security Center Phase 2: security overview page
 
 ### Prompts

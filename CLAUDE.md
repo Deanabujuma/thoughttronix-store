@@ -47,6 +47,9 @@ validation, display copies, and file cleanup).
 Idiomatic Django throughout: class-based views, model methods, custom
 managers/querysets, forms own their validation. Settings read from `.env`
 via environs with working defaults — the app must run with no `.env` present.
+These include `DEFAULT_FROM_EMAIL` (default
+`ThoughtTronix <no-reply@thoughttronix.example>`) and `PASSWORD_RESET_TIMEOUT`
+(seconds, default `3600`); `EMAIL_BACKEND` is always the console backend.
 
 ## Template conventions
 

@@ -9,6 +9,21 @@ urlpatterns = [
     path("login/", views.SignInView.as_view(), name="login"),
     path("logout/", views.SignOutView.as_view(), name="logout"),
     path("security/", views.SecurityView.as_view(), name="security"),
+    path(
+        "password-reset/",
+        views.PasswordResetRequestView.as_view(),
+        name="password_reset",
+    ),
+    path(
+        "password-reset/sent/",
+        views.PasswordResetSentView.as_view(),
+        name="password_reset_done",
+    ),
+    path(
+        "reset/<uidb64>/<token>/",
+        views.PasswordResetHoldingView.as_view(),
+        name="password_reset_confirm",
+    ),
     path("addresses/", views.AddressListView.as_view(), name="addresses"),
     path("addresses/new/", views.AddressCreateView.as_view(), name="address_create"),
     path(

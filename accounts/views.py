@@ -1,10 +1,23 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.views import (
+    LoginView,
+    LogoutView,
+    PasswordResetDoneView,
+    PasswordResetView,
+)
+from django.contrib.humanize.templatetags.humanize import apnumber
 from django.contrib.messages.views import SuccessMessageMixin
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect
+from django.template.defaultfilters import pluralize
 from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
+from django.utils.http import urlsafe_base64_decode
 from django.views import View
+from django.views.decorators.cache import never_cache
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -13,8 +26,8 @@ from django.views.generic import (
     UpdateView,
 )
 
-from .forms import AddressForm, SignInForm, SignupForm
-from .models import Address
+from .forms import AddressForm, PasswordResetRequestForm, SignInForm, SignupForm
+from .models import Address, User
 
 
 class SignupView(SuccessMessageMixin, CreateView):
@@ -51,6 +64,67 @@ class SecurityView(LoginRequiredMixin, TemplateView):
     """The Security overview: one page for every signed-in user, any role."""
 
     template_name = "accounts/security.html"
+
+
+# --- Password reset ---------------------------------------------------------
+
+
+def reset_link_lifetime() -> str:
+    """``PASSWORD_RESET_TIMEOUT`` in words, e.g. 3600 → "one hour"."""
+    seconds = settings.PASSWORD_RESET_TIMEOUT
+    for size, unit in ((3600, "hour"), (60, "minute"), (1, "second")):
+        if seconds % size == 0:
+            count = seconds // size
+            return f"{apnumber(count)} {unit}{pluralize(count)}"
+
+
+class PasswordResetRequestView(PasswordResetView):
+    """Email a reset link; the next page is the same whatever was entered."""
+
+    form_class = PasswordResetRequestForm
+    template_name = "accounts/password_reset_form.html"
+    email_template_name = "accounts/emails/password_reset_email.txt"
+    subject_template_name = "accounts/emails/password_reset_subject.txt"
+    success_url = reverse_lazy("accounts:password_reset_done")
+
+    def form_valid(self, form):
+        self.extra_email_context = {"link_lifetime": reset_link_lifetime()}
+        return super().form_valid(form)
+
+
+class PasswordResetSentView(PasswordResetDoneView):
+    template_name = "accounts/password_reset_done.html"
+
+
+@method_decorator(never_cache, name="dispatch")
+class PasswordResetHoldingView(TemplateView):
+    """A stand-in for the reset-confirm page until setting a password exists.
+
+    It only checks the link: GET-only with no form, so no password can
+    change here, and checking a token never uses it up.
+    """
+
+    template_name = "accounts/password_reset_holding.html"
+
+    def get(self, request, uidb64, token):
+        validlink = self.link_is_valid(uidb64, token)
+        return self.render_to_response(self.get_context_data(validlink=validlink))
+
+    @staticmethod
+    def link_is_valid(uidb64: str, token: str) -> bool:
+        """Whether the uid names a real user and the token is still good."""
+        try:
+            pk = urlsafe_base64_decode(uidb64).decode()
+            user = User._default_manager.get(pk=pk)
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+            ValidationError,
+            User.DoesNotExist,
+        ):
+            return False
+        return default_token_generator.check_token(user, token)
 
 
 # --- Address book -----------------------------------------------------------
