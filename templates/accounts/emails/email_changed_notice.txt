@@ -1,0 +1,10 @@
+{% autoescape off %}Hello {{ user.get_username }},
+
+The email address for your ThoughtTronix account was changed on {{ changed_at|date:"F j, Y" }} at {{ changed_at|time:"g:i A T" }}. Security notices and password-reset links will no longer be sent to this address.
+
+If you made this change, there's nothing else to do.
+
+If you didn't, contact ThoughtTronix staff right away so we can secure your account.
+
+— The ThoughtTronix Store
+{% endautoescape %}

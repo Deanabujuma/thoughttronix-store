@@ -6,6 +6,7 @@ from django.contrib.auth.forms import (
     SetPasswordForm,
     UserCreationForm,
 )
+from django.db import IntegrityError, transaction
 
 from .models import Address, User
 
@@ -88,6 +89,77 @@ class ChangePasswordForm(PasswordChangeForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs["class"] = "input w-full"
+
+
+class ChangeEmailForm(forms.Form):
+    """Change the signed-in user's email, authorized by their current password.
+
+    The new email follows the signup rules: required, lowercased, and
+    unique in any capitalization — the user's own account aside, so
+    re-entering their address in other capitals is fine. Like Django's
+    password forms, it is built for one user and only ever saves that one.
+    """
+
+    email = forms.EmailField(
+        label="New email address",
+        max_length=User._meta.get_field("email").max_length,
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+    )
+    current_password = forms.CharField(
+        label="Current password",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+    )
+
+    def __init__(self, user: User, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "input w-full"
+
+    @staticmethod
+    def duplicate_email_error() -> forms.ValidationError:
+        return forms.ValidationError(
+            "A user with that email address already exists.", code="duplicate_email"
+        )
+
+    def clean_email(self) -> str:
+        """Lowercase the email and reject one another account already uses."""
+        email = self.cleaned_data["email"].lower()
+        others = User.objects.exclude(pk=self.user.pk)
+        if others.filter(email__iexact=email).exists():
+            raise self.duplicate_email_error()
+        return email
+
+    def clean_current_password(self) -> str:
+        password = self.cleaned_data["current_password"]
+        if not self.user.check_password(password):
+            raise forms.ValidationError(
+                "Your current password was entered incorrectly. Please enter it again.",
+                code="password_incorrect",
+            )
+        return password
+
+    def save(self) -> bool:
+        """Save the new email; return whether it was saved.
+
+        Another account can claim the same address between ``clean_email``
+        and this save. The ``unique_lowercase_email`` constraint still
+        rejects it, so that race ends as the usual field error on a valid
+        form turned invalid, with the user's email left as it was.
+        """
+        previous_email = self.user.email
+        self.user.email = self.cleaned_data["email"]
+        try:
+            # A savepoint, so the failed UPDATE doesn't break the request's
+            # transaction for whatever runs after it.
+            with transaction.atomic():
+                self.user.save(update_fields=["email"])
+        except IntegrityError:
+            self.user.email = previous_email
+            self.add_error("email", self.duplicate_email_error())
+            return False
+        return True
 
 
 class AddressForm(forms.ModelForm):

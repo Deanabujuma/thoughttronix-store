@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Change email — The ThoughtTronix Store{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-sm">
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body">
+        <h1 class="card-title text-2xl">Change email</h1>
+        {% if user.email %}
+          <p class="text-sm opacity-70">Your email is currently <span class="break-all font-semibold">{{ user.email }}</span>. Password-reset links and security notices will go to the new address, and we'll let the current one know about the change.</p>
+        {% else %}
+          <p class="text-sm opacity-70">You have no email address on file. Add one to enable password recovery.</p>
+        {% endif %}
+
+        <form method="post" action="{% url 'accounts:email_change' %}" class="mt-4 space-y-4">
+          {% csrf_token %}
+
+          {% for error in form.non_field_errors %}
+            <div class="alert alert-error" role="alert"><span>{{ error }}</span></div>
+          {% endfor %}
+
+          {% for field in form %}
+            <div>
+              <label class="label mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% for error in field.errors %}
+                <p class="mt-1 text-sm text-error">{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endfor %}
+
+          <button type="submit" class="btn btn-primary w-full">Change email</button>
+        </form>
+
+        <p class="mt-4 text-center text-sm">
+          <a href="{% url 'accounts:security' %}" class="link link-primary">Back to Security</a>
+        </p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

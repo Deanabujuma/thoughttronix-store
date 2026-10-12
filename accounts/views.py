@@ -19,6 +19,7 @@ from django.views import View
 from django.views.generic import (
     CreateView,
     DeleteView,
+    FormView,
     ListView,
     RedirectView,
     TemplateView,
@@ -27,6 +28,7 @@ from django.views.generic import (
 
 from .forms import (
     AddressForm,
+    ChangeEmailForm,
     ChangePasswordForm,
     NewPasswordForm,
     PasswordResetRequestForm,
@@ -70,6 +72,44 @@ class SecurityView(LoginRequiredMixin, TemplateView):
     """The Security overview: one page for every signed-in user, any role."""
 
     template_name = "accounts/security.html"
+
+
+class ChangeEmailView(LoginRequiredMixin, FormView):
+    """Change the signed-in user's own email, then tell the old address.
+
+    The form is built for ``request.user`` and nobody else. The notice
+    goes to the previous address only, so a takeover that redirects the
+    account's email is seen by the real owner; there is none when the
+    user had no address before or kept the same one.
+    """
+
+    form_class = ChangeEmailForm
+    template_name = "accounts/email_change.html"
+    success_url = reverse_lazy("accounts:security")
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "user": self.request.user}
+
+    def form_valid(self, form):
+        user = self.request.user
+        previous_email = user.email
+        if not form.save():
+            return self.form_invalid(form)
+        if user.email == previous_email:
+            messages.success(self.request, "Your email address is unchanged.")
+            return super().form_valid(form)
+        messages.success(
+            self.request, f"Your email address has been changed to {user.email}."
+        )
+        # Checked here: a blank recipient would fall back to the new address.
+        if previous_email:
+            user.send_security_notice(
+                "Your ThoughtTronix email address was changed",
+                "accounts/emails/email_changed_notice.txt",
+                {"changed_at": timezone.localtime()},
+                recipient=previous_email,
+            )
+        return super().form_valid(form)
 
 
 class ChangePasswordView(LoginRequiredMixin, PasswordChangeView):

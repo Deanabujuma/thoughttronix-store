@@ -28,6 +28,256 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-11 — Account Security Center Phase 6: change email
+
+### Prompts
+Phase 6 ran in one agent session, which began after `/clear`. Prompt text
+is verbatim.
+
+1. @prd/account-security.md @plans/account-security.md
+
+   Implement Phase 6 only: Change Email.
+
+   Follow the approved PRD and tracer-bullet implementation plan,
+   especially the Phase 6 user stories and acceptance criteria.
+
+   Allow authenticated customers, employees, and administrators to change
+   their own email address from the Account Security Center.
+
+   Requirements:
+   - Add a Change email button to the Email card on the Security overview.
+   - Create a DaisyUI-styled form that requires the user's current password
+     and new email address.
+   - Normalize the new email to lowercase and enforce case-insensitive
+     uniqueness using the existing model constraint.
+   - Reject incorrect passwords, invalid email addresses, and emails already
+     registered to another account.
+   - After a successful change, redirect to Security with a clear success
+     message.
+   - Send a security notification to the OLD email address confirming the
+     change, using the existing console email backend and
+     User.send_security_notice helper.
+   - Handle accounts that currently have no email address safely.
+   - Ensure users can change only their own email addresses.
+   - Preserve functionality from Phases 1–5.
+
+   Create automated tests covering the Phase 6 acceptance criteria,
+   including successful changes, validation errors, duplicate emails,
+   notifications to the old address, and accounts without an existing
+   email.
+
+   Run pytest, Ruff checks, Django system checks, and migration checks.
+
+   Review the acceptance criteria and explain how I can manually test the
+   feature in the browser.
+
+   Do not implement Phase 7. Do not commit anything yet.
+
+   Preserve my modified db.sqlite3 and local test accounts. I want to
+   review and manually test Phase 6 before committing.
+2. Phase 6 manual browser testing is complete and passed.
+
+   I verified:
+   - The Change Email form displays correctly.
+   - An incorrect current password is rejected.
+   - A successful email change updates the Security page to
+     dana.new@example.com.
+   - The security notification is sent to the OLD email, dana@example.com,
+     not the new address.
+   - An email already belonging to another account is rejected.
+   - A rejected duplicate-email attempt leaves my current email unchanged.
+
+   Please update PROMPTS.md with the complete Phase 6 session history,
+   including all exact prompts, the implementation summary, automated
+   tests, manual testing, corrections, deviations, and any issues
+   encountered.
+
+   Run the full pytest suite, Ruff lint and formatting checks, Django
+   system checks, and migration checks.
+
+   Review git status and stage only the intended Phase 6 implementation
+   files and PROMPTS.md.
+
+   Preserve my modified db.sqlite3 and all local test accounts.
+
+   Show me the staged files, test results, and any deviations from the PRD
+   before committing.
+
+   Do not commit anything or start Phase 7 until I approve.
+3. The Phase 6 staged files and test results look good.
+
+   Before committing, please address the identified duplicate-email race
+   condition so a database uniqueness conflict is handled gracefully with a
+   user-friendly form error rather than an unhandled database exception.
+
+   Add a regression test for this specific case. Preserve the existing
+   unique_lowercase_email database constraint and do not add unnecessary
+   migrations.
+
+   Run pytest, Ruff, Django system checks, and migration checks again.
+
+   Update the Phase 6 PROMPTS.md entry with this prompt, the fix, test
+   results, and any relevant implementation decisions.
+
+   Then stage only the intended Phase 6 files and PROMPTS.md, excluding
+   db.sqlite3.
+
+   Show me the final staged file list and check results before committing.
+   Do not commit or start Phase 7 until I approve.
+
+### Summary
+- **Outcome:** Change email is now available from the Security page.
+  - `accounts/forms.py`: `ChangeEmailForm` is a plain `forms.Form` built
+    for one user, like Django's password forms. It has two fields: "New
+    email address" (an `EmailField`) and "Current password". Both use
+    DaisyUI `input w-full` widgets. `clean_email` lowercases the address and
+    rejects one that another account uses in any capitalization, with the
+    same message as signup. The user's own account is excluded, so their
+    own address in other capitals is accepted. `clean_current_password`
+    checks the password with `check_password`. `save()` writes only
+    `email`, and `User.save()` lowercases it as before. After prompt 3,
+    `save()` also handles the duplicate-email race; see **Race-condition
+    fix** below.
+  - `accounts/views.py`: `ChangeEmailView` is `LoginRequiredMixin` +
+    `FormView`. It hands the form `request.user`, so there is no user id in
+    the URL or the form. On success it redirects to `accounts:security`
+    with "Your email address has been changed to <new>.". It then sends the
+    email-changed notice through `User.send_security_notice`, addressed
+    explicitly to the previous email. If the address didn't change (the
+    same address re-entered in other capitals), the message is "Your email
+    address is unchanged." and no notice is sent. If there was no previous
+    address, no notice is sent either.
+  - `accounts/urls.py`: `security/email/` → `accounts:email_change`.
+  - `templates/accounts/security.html`: the **Email** card gains a "Change
+    email" button. It shows whether or not the account has an email.
+  - `templates/accounts/email_change.html`: a new page. It shows the current
+    address (or says there is none), the two fields with per-field errors,
+    and a link back to Security.
+  - `templates/accounts/emails/email_changed_notice.txt`: the plain-text
+    notice. It has the username and the date and time of the change, says
+    notices and reset links no longer go to this address, and tells the
+    reader to contact ThoughtTronix staff if they didn't make the change.
+    It contains no password, no reset link, and not the new address.
+  - No model change and no migration.
+- **Race-condition fix (prompt 3):** the agent's earlier report pointed out
+  a gap. Two requests could both pass `clean_email` for the same address,
+  and the second save would then hit the `unique_lowercase_email`
+  constraint and raise an unhandled `IntegrityError` (a 500 page).
+  - `ChangeEmailForm.save()` now saves inside `transaction.atomic()`, a
+    savepoint, so the failed UPDATE doesn't break the rest of the request's
+    transaction. On `IntegrityError` it puts the user's previous email back
+    on the in-memory `request.user`, adds the usual "A user with that email
+    address already exists." error to the `email` field, and returns
+    `False`. On success it returns `True`.
+  - `ChangeEmailView.form_valid` returns `form_invalid(form)` when
+    `save()` returns `False`. That re-renders the form with the field
+    error, with no success message and no notice.
+  - The duplicate message is now built by one
+    `ChangeEmailForm.duplicate_email_error()` helper, used by both
+    `clean_email` and `save()`. It returns a new `ValidationError` each
+    time rather than reusing one shared exception instance.
+  - Decisions: the handling lives in the form, because the project's
+    convention is that forms own their validation. The query check in
+    `clean_email` stays, so ordinary duplicates still get the error without
+    a database round trip that fails. The constraint is unchanged and no
+    migration was added. `SignupForm` was left as it is (Phase 1 code
+    outside this prompt's scope). It has the same theoretical race on
+    account creation.
+- **Automated tests:** `accounts/test_email_change.py` adds 30 tests.
+  They cover:
+  - the Email card's button, for users with and without an email
+  - signed-out GET and POST redirected to login with `next`, and the email
+    unchanged
+  - customer, staff, and admin each get the styled form, and staff and
+    admin can complete a change
+  - extra `user`/`username` POST fields are ignored, and another user's
+    password does not count as the current password
+  - field errors for a wrong or empty current password, and for a blank,
+    whitespace-only, invalid, taken, or taken-in-other-capitals email;
+    each leaves the email unchanged and sends no email
+  - the exact wording of the wrong-password and duplicate-email errors
+  - the redirect to Security with the success message and the new address
+    on the card
+  - a mixed-case new email is stored lowercase
+  - your own address in other capitals is accepted, stays lowercase, and
+    sends nothing
+  - the user stays signed in after the change
+  - exactly one plain-text notice, addressed only to the previous email,
+    with the date and no password, new address, or `/reset/` link
+  - a user with no email adds one: no notice, and the no-email warning
+    disappears
+  - editing a user's email in the Django admin sends nothing and stores it
+    lowercase
+  - after a change, a reset request for the old address sends nothing and
+    one for the new address sends the reset email
+  - (prompt 3) a regression test for the race. It wraps the real
+    `clean_email` so a rival account claims the address, in other
+    capitals, right after the duplicate check passes and before the save.
+    The response is a 200 with the field error, the page still shows the
+    old address, there is no success message and no email, both accounts
+    keep their addresses, and the user is still signed in. The agent
+    checked that the test fails when the guard is removed (an unhandled
+    `IntegrityError: UNIQUE constraint failed: index
+    'unique_lowercase_email'`) and passes with it.
+
+  Before prompt 3, the full suite passed 456 tests (427 from Phases 1–5
+  plus 29 new). After the fix it passed 457. Both times, `ruff check`,
+  `ruff format --check`, `manage.py check`, and
+  `makemigrations --check --dry-run` were all clean.
+- **Manual verification (developer, in the browser):** the form displays
+  correctly; a wrong current password is rejected; a successful change
+  updates the Security page to `dana.new@example.com`; the notice goes to
+  the old address, `dana@example.com`, not the new one; an email that
+  belongs to another account is rejected; and that rejected attempt leaves
+  the current email unchanged. This was done before the prompt 3 fix. The
+  race can't practically be triggered by hand, so only its automated test
+  covers it.
+- **Deviations:** none from the plan's acceptance criteria. No follow-up
+  questions were asked. Choices the PRD and prompts left open, and one
+  wording point:
+  - Prompt 1 asked for uniqueness "using the existing model constraint".
+    The form checks for a duplicate with an `email__iexact` query to give a
+    friendly field error, the same way the signup form does. The existing
+    `unique_lowercase_email` constraint stays as the database backstop. As
+    first built, the form didn't handle that backstop firing, so if two
+    requests raced for the same address, the loser would get a database
+    error instead of a form error. The agent reported this, and prompt 3
+    had it fixed.
+  - Re-entering the current address counts as success with "Your email
+    address is unchanged." and sends no notice. The PRD doesn't cover this
+    case.
+  - The button reads "Change email" even when the account has no email.
+  - The form asks for the new email first, then the current password. That
+    is the plan's order; prompt 1 listed them the other way round.
+  - The success message wording and the notice's text are the agent's.
+    The PRD asked only for "a confirmation message" and a notice to the
+    previous address.
+- **Sideways:**
+  - **Notice sent to the new address:** the first version of the view
+    called `send_security_notice(..., recipient=previous_email)` without a
+    check. When the previous email was blank, the helper fell back to the
+    user's *current* (new) email, so a staff member adding their first
+    address got the notice. The new test for a user without an email
+    caught this on the first run (28 passed, 1 failed). The view now sends
+    only when there was a previous address. `send_security_notice` itself
+    was not changed.
+  - **The race condition itself**, described above: the agent left it in
+    the first build and reported it as a deviation instead of fixing it.
+    The developer asked for the fix before committing.
+  - While fixing it, the agent first stored the duplicate error as one
+    class-level `ValidationError` instance and raised that same instance
+    every time. Before running any tests, it replaced this with a helper
+    that builds a new error on each call, because raising a shared
+    exception instance keeps adding tracebacks to it.
+  - `ruff format` reformatted `accounts/forms.py` and the new test file on
+    the first full check. The full checks were run again after that and
+    passed.
+  - Line endings: all edits were made with the editor tools, not a
+    text-mode script, so the Phase 4–5 CRLF slip did not repeat.
+    `git ls-files --eol` showed LF for every Phase 6 file.
+  - `db.sqlite3` was already modified before the session. It was neither
+    changed nor staged. The tests run on pytest's own test database.
+
 ## 2026-10-11 — Account Security Center Phase 5: change password
 
 ### Prompts
