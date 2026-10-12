@@ -3,8 +3,10 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.core.mail import send_mail
 from django.db import models, transaction
 from django.db.models.functions import Lower
+from django.template.loader import render_to_string
 
 from .validators import US_STATES, zip_validator
 
@@ -39,6 +41,28 @@ class User(AbstractUser):
         """Lowercase the email on every save — signup, admin, shell, seed."""
         self.email = self.email.lower()
         super().save(*args, **kwargs)
+
+    def send_security_notice(
+        self,
+        subject: str,
+        template_name: str,
+        context: Mapping[str, Any] | None = None,
+        recipient: str | None = None,
+    ) -> bool:
+        """Email a plain-text security notice; return whether one was sent.
+
+        It goes to ``recipient`` when given, else to the current email, and
+        nothing is sent when there is no address. Views call this only after
+        a change succeeds — never saves or signals — so the admin, shell,
+        and ``seed`` stay silent. The template gets ``user`` plus
+        ``context``, and must never be handed a password or token.
+        """
+        address = recipient or self.email
+        if not address:
+            return False
+        body = render_to_string(template_name, {"user": self, **(context or {})})
+        send_mail(subject, body, None, [address])
+        return True
 
 
 # Address field → the suffix of its checkout field (``shipping_zip`` etc.).

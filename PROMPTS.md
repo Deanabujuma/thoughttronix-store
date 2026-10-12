@@ -28,6 +28,315 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-11 — Account Security Center Phase 4: password reset confirmation and completion
+
+### Prompts
+Phase 4 ran across three agent sessions. Prompt text is verbatim; times
+are local (UTC−5).
+
+*Session 1 — 2026-10-08, 13:53, began after `/clear`:*
+
+1. @prd/account-security.md @plans/account-security.md
+
+   Implement Phase 4 only: Password Reset Confirmation and Completion.
+
+   Follow the approved PRD and tracer-bullet implementation plan.
+
+   Replace Phase 3's temporary reset-link holding page with Django's
+   built-in PasswordResetConfirmView and implement the complete
+   password-reset flow.
+
+   Requirements:
+   - A valid reset link opens a DaisyUI-styled form to enter and confirm a
+     new password.
+   - Apply Django's standard password validation.
+   - Invalid, expired, and previously used links must be rejected safely.
+   - Reset links must expire after one hour, using the existing
+     PASSWORD_RESET_TIMEOUT setting.
+   - After successfully resetting a password, show a completion page with a
+     link to sign in.
+   - Do not automatically sign the user in.
+   - Send a password-changed notification through the existing console
+     email backend after a successful reset.
+   - Maintain safe error handling and do not expose account information.
+   - Preserve existing functionality from Phases 1–3.
+
+   Create automated tests covering the relevant Phase 4 acceptance
+   criteria, including valid and invalid tokens, expiration, password
+   validation, successful completion, notification emails, and prevention
+   of token reuse.
+
+   Run the complete pytest suite, Ruff checks, Django system checks, and
+   migration checks.
+
+   Review the Phase 4 acceptance criteria and explain exactly how I can
+   manually verify the feature in the browser.
+
+   Do not implement Phases 5–7. Do not commit
+2. The Django server crashed with a SyntaxError in accounts/models.py at
+   line 56: Non-UTF-8 code starting with '\x97'.
+
+   Please inspect and fix any encoding corruption introduced during Phase
+   4. Check the affected Python files for invalid characters or encoding
+   problems.
+
+   Run Django system checks, pytest, and Ruff checks after fixing it.
+
+   Preserve db.sqlite3 and my local test accounts. Do not commit anything
+   or begin Phase 5.
+
+*Session 2 — 2026-10-09, 09:39:*
+
+3. Phase 4 manual testing revealed an issue.
+
+   The password-reset email is generated correctly, but opening the link
+   displays "Invalid reset link" instead of "Choose a new password."
+
+   The Django server logs show a 301 redirect for the reset URL followed by
+   a 200 response on the invalid-link page.
+
+   Please investigate why the freshly generated reset token is rejected.
+   Check URL formatting, possible copied line breaks or email
+   quoted-printable encoding, Django token validation, and any relevant
+   Phase 4 view or routing issues.
+
+   Add a regression test if you find an application bug.
+
+   Run pytest, Ruff, and Django checks after any changes. Preserve
+   db.sqlite3 and my local accounts.
+
+   Do not commit anything or start Phase 5. Explain what you find and how I
+   should retest.
+
+*Session 3 — 2026-10-11, 21:18:*
+
+4. resume
+5. Do not commit Phase 4 or start Phase 5 yet.
+
+   The original issue from manual testing is still unresolved: a freshly
+   generated password-reset email link opened the "Invalid reset link"
+   page.
+
+   Please specifically investigate the link formatting and token handling.
+   The Django console email displayed a long URL split across lines,
+   including a trailing "=" character, and the browser/server showed a 301
+   redirect before displaying the invalid-link page.
+
+   Check whether the email's quoted-printable transfer encoding or a copied
+   line break caused the problem, versus an actual application bug.
+
+   Add a regression test that verifies a link extracted from the generated
+   email works end-to-end.
+
+   Keep the login-page success redirect because it follows the PRD. Run the
+   full test suite and checks after any fixes.
+
+   Preserve db.sqlite3 and my test accounts. Do not commit until I manually
+   verify the reset flow.
+6. Phase 4 manual browser testing is complete and passed.
+
+   I verified:
+   - A valid reset link opens the new-password form.
+   - Weak passwords are rejected.
+   - A strong new password successfully resets the account.
+   - The user is redirected to the login page.
+   - The new password works and the old password is rejected.
+   - The password-changed notification appears in the Django console.
+   - The previously used reset link displays "Invalid reset link."
+
+   Please update PROMPTS.md with the Phase 4 session history, including
+   the exact prompts, implementation summary, automated tests, manual
+   testing, encoding issue, quoted-printable email URL issue, regression
+   tests, and corrections.
+
+   Run final pytest, Ruff, Django system checks, and migration checks.
+
+   Review git status and stage only the intended Phase 4 files and
+   PROMPTS.md. Preserve my modified db.sqlite3 and local test accounts.
+
+   Show me the staged file list, test results, and any deviations from the
+   PRD before committing.
+
+   Do not commit anything or start Phase 5 until I approve.
+7. I approve the Phase 4 implementation and the 10 staged files.
+
+   Before committing, please add the final CRLF-to-LF correction from this
+   session to the Sideways section of the Phase 4 PROMPTS.md entry, so the
+   documentation is complete.
+
+   Stage the updated PROMPTS.md and verify that only the 10 intended Phase
+   4 files are staged.
+
+   Then commit with the message "Complete the password reset flow" and
+   include your Claude co-author line.
+
+   Do not stage or commit db.sqlite3. Preserve my local test accounts.
+
+   After committing, show me the commit hash and final git status. Do not
+   begin Phase 5 yet.
+
+### Summary
+- **Outcome:** Phase 4 of `plans/account-security.md` is built, manually
+  verified by the developer, approved, and committed as "Complete the
+  password reset flow". Nothing from Phases 5–7 was added.
+  - **Implementation:**
+    - `accounts/models.py` adds `User.send_security_notice(subject,
+      template_name, context=None, recipient=None)`. It renders a
+      plain-text template and sends it to `recipient`, or else to the
+      current email, and returns `False` without sending when there is no
+      address. It is called only from views, never from saves or signals.
+    - `accounts/forms.py` adds `NewPasswordForm`, Django's
+      `SetPasswordForm` with DaisyUI classes. It applies
+      `AUTH_PASSWORD_VALIDATORS` and checks that the two entries match.
+    - `accounts/views.py`:
+      - `PasswordResetHoldingView` is removed.
+      - `PasswordResetSetView` subclasses `PasswordResetConfirmView`, with
+        `post_reset_login = False`. On success it adds the flash message
+        "Your password has been reset successfully. Please sign in with
+        your new password.", sends the password-changed notice, and
+        redirects to `accounts:login`. Django's own token rules handle
+        expiry, single use, invalidation by a later password change, and
+        sign-out of every existing session. Django also moves the token out
+        of the address bar to `/accounts/reset/<uid>/set-password/`.
+      - `PasswordResetFinishedView` is a `RedirectView` to login at
+        `accounts:password_reset_complete`. It keeps the plan's named URL.
+      - `send_password_changed_notice(request, user)` sends the notice with
+        the local date and time and an absolute link to
+        `accounts:password_reset`. Phase 5 can reuse it.
+    - `accounts/urls.py` points `password_reset_confirm` at the new view and
+      adds `reset/done/` as `password_reset_complete`.
+    - Templates: a new `password_reset_confirm.html` shows "Choose a new
+      password" with the form, or "Invalid reset link" with a link to
+      request a new one. A new `emails/password_changed_notice.txt` holds
+      the date, the time, and the reset-page link, with no password, uid,
+      or token. `password_reset_holding.html` is deleted.
+  - **Automated verification:**
+    - **`accounts/test_password_reset_confirm.py`** is new, with 32 tests:
+      - **The form:** a link from the email opens the form, and the token
+        is kept out of the address bar.
+      - **Rejected passwords:** too short, common or all numbers, too like
+        the account, and mismatched entries all show field errors, leave
+        the password unchanged, and send no email. A rejected attempt
+        leaves the link usable.
+      - **Success:** the user lands on login with the exact message and is
+        not signed in. The `reset/done/` URL leads on to login. The new
+        password works and the old one doesn't. A session signed in on
+        another client is sent to login.
+      - **The link as delivered:** see the quoted-printable item under
+        **Sideways**.
+      - **Dead links:** a used link, including a second attempt from a new
+        client, plus tampered tokens, unknown uids, and posting to the form
+        without opening the link all show the invalid page.
+      - **Expiry:** with a 60-second timeout, a link still works at 59
+        seconds and fails at 61. With the default timeout it fails after
+        one hour. A link issued before a later password change is invalid.
+      - **The notice:** exactly one plain-text email, from
+        `DEFAULT_FROM_EMAIL`, to the user's address. It has the date and
+        the reset link, and contains no password, uid, or token. A user
+        with no email gets nothing.
+      - **`send_security_notice`:** it sends nothing without an address,
+        defaults to the current email, and accepts an explicit recipient.
+      - **Silent changes:** `set_password()` + `save()`, the Django admin,
+        and `seed` send nothing.
+    - **`accounts/test_password_reset.py`:** the holding-page tests are
+      removed. The Phase 3 request and settings tests are unchanged.
+
+    The final full suite passes (405 tests). `ruff check`,
+    `ruff format --check`, `manage.py check`, `makemigrations --check`, and
+    `migrate --check` are clean. Phase 4 adds no migrations.
+  - **Manual testing:** the developer tested in the browser and verified:
+    - a valid reset link opens the new-password form
+    - weak passwords are rejected
+    - a strong new password resets the account
+    - the user is redirected to the login page
+    - the new password works and the old one is rejected
+    - the password-changed notice appears in the Django console
+    - the used reset link shows "Invalid reset link"
+  - **Commit scope:** staged `accounts/forms.py`, `accounts/models.py`,
+    `accounts/views.py`, `accounts/urls.py`,
+    `accounts/test_password_reset.py`, the new
+    `accounts/test_password_reset_confirm.py`,
+    `templates/accounts/password_reset_confirm.html`,
+    `templates/accounts/emails/password_changed_notice.txt`, the deletion
+    of `templates/accounts/password_reset_holding.html`, and `PROMPTS.md`.
+    `db.sqlite3` (already modified by the developer's local test accounts)
+    was left unstaged and unmodified. The diagnostics and tests used
+    pytest's temporary database. One read-only probe in session 3 rendered
+    a reset email against the dev database.
+- **Deviations:**
+  - Prompt 1 asked for "a completion page with a link to sign in". The PRD
+    and plan say a successful reset goes to the login page with the
+    success message. Session 1 built the completion page and flagged the
+    difference. At the start of session 3, the agent read the PRD as
+    authoritative and switched to the login redirect before the developer
+    had ruled. Prompt 5 then confirmed it ("Keep the login-page success
+    redirect because it follows the PRD"). The completion page template was
+    deleted.
+  - The PRD lists "reset complete" among the views that subclass Django's
+    built-ins. Because the confirm step now goes straight to login, it is a
+    plain `RedirectView` that only keeps the named URL alive.
+  - Prompt 3 asked for a regression test only "if you find an application
+    bug". Session 2 found none and added none. Prompt 5 asked for one
+    anyway, and session 3 added two.
+- **Sideways:**
+  - **Encoding corruption (prompt 2):** in session 1, the agent edited
+    `accounts/models.py` with an inline Python script that saved in the
+    Windows default encoding. The two em dashes in the
+    `send_security_notice` docstring became the byte `\x97`, which is not
+    valid UTF-8. The same script switched five files to CRLF line endings.
+    Ruff refused to read the file, so the agent repaired both problems
+    before running the tests. But the developer's dev server reloaded
+    while the bad file was on disk and crashed with the `SyntaxError`.
+    The Phase 4 summary never mentioned the repair. In session 1's reply
+    to prompt 2, the agent confirmed every Phase 4 file was valid UTF-8
+    with LF endings, found no `\x97` bytes anywhere in the project,
+    admitted it should have reported the repair, and switched to the file
+    tools for edits. This entry was written with the file tools for the
+    same reason.
+  - **Quoted-printable reset link (prompts 3 and 5):** the reset email
+    was correct, but the copied link was broken. At host `127.0.0.1:8000`
+    the link line is about 81 characters. Python's email library, which
+    Django 6 uses, sends any body over 78 characters per line as
+    quoted-printable. The console backend prints the raw encoded email, so
+    the link appears with a soft break: an `=` at the end of the line, and
+    the token's last characters on the next line. Copying only the first
+    line gives a URL with no trailing slash and a cut-off token ending in
+    `=`. Django's `APPEND_SLASH` answers with a 301, and the token check
+    then shows "Invalid reset link". Joining the two lines with the `=`
+    kept is also invalid. The decoded link, which a real mail client
+    shows, opens the form. The earlier tests missed this because they
+    read `message.body`, the text before encoding, at the short
+    `testserver` host.
+    - Session 2 diagnosed this with a throwaway test, changed no code, and
+      explained how to join the lines when retesting.
+    - In session 3, after prompt 4 ("resume"), the agent did not have
+      session 2's transcript in context and investigated again from
+      scratch. It reproduced the same three outcomes, again with no
+      application bug.
+    - Two regression tests were added at host `127.0.0.1:8000`.
+      `test_a_link_read_from_the_delivered_email_resets_the_password`
+      decodes the encoded email the way a mail client does, follows the
+      link with no 301, sets a new password, lands on login with the
+      message, and signs in. `test_a_long_link_is_wrapped_on_the_wire`
+      pins the quoted-printable wrapping, so the console's `=` keeps an
+      explanation.
+    - No application code changed for this. A dev-only email backend
+      that prints decoded bodies was offered but not built, because
+      `CLAUDE.md` says `EMAIL_BACKEND` is always the console backend.
+  - **Line endings (session 3):** the agent repeated a slip from session
+    1. It edited `accounts/views.py` and
+    `accounts/test_password_reset_confirm.py` with inline Python scripts
+    whose `write_text` call saves Windows CRLF line endings. The encoding
+    stayed valid UTF-8, and no text changed. The final pre-staging scan
+    caught the CRLF endings, and both files were converted back to LF to
+    match the other Phase 4 files before staging. Git's
+    `core.autocrlf=true` would have stored LF anyway. The agent reported
+    this in its staging summary but had left it out of the first version
+    of this entry. Prompt 7 asked for it to be added.
+  - Writing this entry: session 3 recovered the exact text of prompts 1–3
+    from the earlier sessions' local transcripts rather than
+    reconstructing it.
+
 ## 2026-10-08 — Account Security Center Phase 3: password reset request and email
 
 ### Prompts

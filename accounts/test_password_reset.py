@@ -1,4 +1,7 @@
-"""Password reset, request side: the link, the generic answer, the email."""
+"""Password reset, request side: the link, the generic answer, the email.
+
+The page the emailed link opens is tested in ``test_password_reset_confirm``.
+"""
 
 import importlib
 import re
@@ -185,64 +188,6 @@ def test_the_email_templates_live_in_the_emails_folder(client, dana):
     names = {t.name for t in response.templates}
     assert "accounts/emails/password_reset_email.txt" in names
     assert "accounts/emails/password_reset_subject.txt" in names
-
-
-# --- Holding page -------------------------------------------------------------
-
-
-def test_the_emailed_link_opens_the_recognized_page(client, dana, mailoutbox):
-    request_reset(client, "dana@example.com")
-
-    response = client.get(link_in(mailoutbox[0]))
-
-    html = response.content.decode()
-    assert response.status_code == HTTPStatus.OK
-    assert "Reset link recognized" in html
-    assert "<form" not in html  # signed out, so not even the navbar's logout
-
-
-def test_a_tampered_token_is_not_valid(client, dana):
-    uid = urlsafe_base64_encode(force_bytes(dana.pk))
-    url = reverse("accounts:password_reset_confirm", args=[uid, "abc-123tampered"])
-
-    html = client.get(url).content.decode()
-
-    assert "not valid" in html
-    assert "Reset link recognized" not in html
-    assert f'href="{reverse("accounts:password_reset")}"' in html
-
-
-def test_an_unknown_uid_is_not_valid(client, dana):
-    token = default_token_generator.make_token(dana)
-    url = reverse("accounts:password_reset_confirm", args=["bm9wZQ", token])
-
-    assert "not valid" in client.get(url).content.decode()
-
-
-def test_visiting_the_holding_page_does_not_use_up_the_link(client, dana):
-    url = reset_link(dana)
-    token = url.rstrip("/").rsplit("/", 1)[-1]
-
-    client.get(url)
-    second = client.get(url)
-
-    assert "Reset link recognized" in second.content.decode()
-    dana.refresh_from_db()
-    assert default_token_generator.check_token(dana, token)
-
-
-def test_a_post_to_the_holding_page_changes_nothing(client, dana):
-    response = client.post(
-        reset_link(dana),
-        {
-            "new_password1": "brand-new-thought-42",
-            "new_password2": "brand-new-thought-42",
-        },
-    )
-
-    assert response.status_code == HTTPStatus.METHOD_NOT_ALLOWED
-    dana.refresh_from_db()
-    assert dana.check_password("dana12345")
 
 
 # --- Settings -----------------------------------------------------------------
