@@ -1,5 +1,43 @@
 # Reflection
 
+## Account Security Center
+
+### Question 1 — Review One Phase
+
+I chose Phase 4, which focused on completing the password reset feature. The goal was to let users open a reset link, create a new password, and sign back into their accounts.
+
+When I tested this phase in my browser, I ran into an issue because the reset link kept showing as invalid. After investigating, I found out that the email formatting was splitting the link into two lines. Once I removed the extra formatting character and combined the link correctly, the password reset form worked.
+
+I also tested a weak password, which the system rejected because it was too common and entirely numeric. Then I created a stronger password and successfully signed in. I confirmed that my previous password no longer worked and that the reset link couldn't be reused. After seeing these results, I felt comfortable approving Phase 4 and moving on to Phase 5.
+
+### Question 2 — Authentication Code Versus the Lesson
+
+Two Django authentication components used in my project are `LoginRequiredMixin` and `AuthenticationForm`.
+
+`LoginRequiredMixin` appears in `accounts/views.py`, where `SecurityView` uses it to require users to sign in before accessing the Security page. When I tested this, the application redirected me to login if I wasn't authenticated.
+
+`AuthenticationForm` appears in `accounts/forms.py`, where `SignInForm` inherits from it. Django handles the login credential validation, while my project adds DaisyUI styling.
+
+These components follow the authentication approach from the lesson because they use Django's built-in security features rather than implementing my own login system.
+
+### Question 3 — Password Management Versus the Lesson
+
+I chose the password reset feature. In `accounts/views.py`, `PasswordResetSetView` uses Django's `PasswordResetConfirmView`. The password reset form uses Django's `SetPasswordForm`, with custom styling to match the website.
+
+Django handles important security features such as checking reset tokens and validating new passwords. I tested these protections by attempting to use a weak password and by opening a reset link after it had already been used.
+
+This approach matches the lesson because I relied on Django's built-in password management instead of creating my own security-sensitive logic. My project also sends a password-change notification through the console email backend and redirects users to login after a successful reset.
+
+### Question 4 — The Tracer-Bullet Plan
+
+I chose Phase 3 because it demonstrated why dividing the implementation into smaller phases was useful.
+
+By the end of Phase 3, users could click Forgot Password, submit an email address, and generate a password reset email in the terminal. The application showed the same confirmation message whether the email was registered or not, which helped protect account privacy.
+
+At this point, the reset link opened a temporary page to verify its validity, but users couldn't change their passwords yet. That functionality was implemented in Phase 4.
+
+This was a useful stopping point because I could verify that password reset requests and email generation worked before adding the actual password-changing process. It made reviewing the feature easier and helped separate issues with generating reset links from issues with setting a new password.
+
 ## Product Images
 
 ### Question 1 — Interview decision
