@@ -20,6 +20,11 @@ urlpatterns = [
         name="password_change",
     ),
     path(
+        "security/devices/",
+        views.SignOutOtherDevicesView.as_view(),
+        name="sign_out_other_devices",
+    ),
+    path(
         "password-reset/",
         views.PasswordResetRequestView.as_view(),
         name="password_reset",

@@ -33,5 +33,15 @@
         </div>
       </div>
     </article>
+
+    <article class="card bg-base-100 shadow-md">
+      <div class="card-body">
+        <h2 class="card-title">Devices</h2>
+        <p class="text-sm opacity-70">Left yourself signed in on a shared or lost device? Sign it out without changing your password. You'll stay signed in here.</p>
+        <div class="card-actions mt-2">
+          <a href="{% url 'accounts:sign_out_other_devices' %}" class="btn btn-primary btn-sm">Sign out of all other devices</a>
+        </div>
+      </div>
+    </article>
   </div>
 {% endblock %}

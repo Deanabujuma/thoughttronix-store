@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import (
     LoginView,
@@ -33,6 +34,7 @@ from .forms import (
     NewPasswordForm,
     PasswordResetRequestForm,
     SignInForm,
+    SignOutOtherDevicesForm,
     SignupForm,
 )
 from .models import Address, User
@@ -130,6 +132,30 @@ class ChangePasswordView(LoginRequiredMixin, PasswordChangeView):
         messages.success(self.request, "Your password has been changed.")
         send_password_changed_notice(self.request, form.user)
         return response
+
+
+class SignOutOtherDevicesView(LoginRequiredMixin, FormView):
+    """Sign the user out everywhere but here, once they confirm their password.
+
+    GET only shows the confirmation form; the sign-out is a POST. Rotating
+    ``session_salt`` changes the session auth hash, so every session fails
+    Django's hash check on its next request; ``update_session_auth_hash``
+    then stores the new hash in this one, so it survives. The password is
+    unchanged, so no notice is sent.
+    """
+
+    form_class = SignOutOtherDevicesForm
+    template_name = "accounts/sign_out_other_devices.html"
+    success_url = reverse_lazy("accounts:security")
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "user": self.request.user}
+
+    def form_valid(self, form):
+        form.user.sign_out_other_sessions()
+        update_session_auth_hash(self.request, form.user)
+        messages.success(self.request, "You've been signed out of all other devices.")
+        return super().form_valid(form)
 
 
 # --- Password reset ---------------------------------------------------------

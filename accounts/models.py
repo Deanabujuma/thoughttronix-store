@@ -1,4 +1,5 @@
-from collections.abc import Mapping
+import secrets
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from django.conf import settings
@@ -7,8 +8,14 @@ from django.core.mail import send_mail
 from django.db import models, transaction
 from django.db.models.functions import Lower
 from django.template.loader import render_to_string
+from django.utils.crypto import salted_hmac
 
 from .validators import US_STATES, zip_validator
+
+
+def new_session_salt() -> str:
+    """A fresh random value for ``User.session_salt``."""
+    return secrets.token_hex(16)
 
 
 class User(AbstractUser):
@@ -20,10 +27,17 @@ class User(AbstractUser):
     Email stays optional on the model, so staff and admin accounts without
     one remain valid; signup is what requires it. A non-blank email is
     stored lowercase and belongs to one account only, in any capitalization.
+
+    ``session_salt`` is mixed into the session auth hash, so rotating it
+    signs out every session that hasn't been refreshed with the new hash —
+    "Sign out of all other devices" — without touching the password.
     """
 
     # Nullable per the PRD: an absent job title is unknown, not empty.
     job_title = models.CharField(max_length=150, null=True, blank=True)  # noqa: DJ001
+    session_salt = models.CharField(
+        max_length=32, default=new_session_salt, editable=False
+    )
 
     class Meta(AbstractUser.Meta):
         constraints = [
@@ -41,6 +55,35 @@ class User(AbstractUser):
         """Lowercase the email on every save — signup, admin, shell, seed."""
         self.email = self.email.lower()
         super().save(*args, **kwargs)
+
+    def get_session_auth_hash(self) -> str:
+        """Django's password-based session hash, with ``session_salt`` mixed in."""
+        return self._salted_session_auth_hash()
+
+    def get_session_auth_fallback_hash(self) -> Iterator[str]:
+        """The same hash under each of ``SECRET_KEY_FALLBACKS``."""
+        for fallback_secret in settings.SECRET_KEY_FALLBACKS:
+            yield self._salted_session_auth_hash(secret=fallback_secret)
+
+    def _salted_session_auth_hash(self, secret: str | None = None) -> str:
+        key_salt = "accounts.User.get_session_auth_hash"
+        return salted_hmac(
+            key_salt,
+            f"{self.password}:{self.session_salt}",
+            secret=secret,
+            algorithm="sha256",
+        ).hexdigest()
+
+    def sign_out_other_sessions(self) -> None:
+        """Rotate ``session_salt`` so every existing session fails its hash check.
+
+        That includes the caller's own session: the view must follow this
+        with ``update_session_auth_hash`` to keep the current device signed
+        in. The password is untouched, so outstanding reset links still work
+        and no notice is sent.
+        """
+        self.session_salt = new_session_salt()
+        self.save(update_fields=["session_salt"])
 
     def send_security_notice(
         self,

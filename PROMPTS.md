@@ -28,6 +28,233 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-11 — Account Security Center Phase 7: sign out of all other devices
+
+### Prompts
+Phase 7 ran in one agent session, which began after `/clear`. Prompt text
+is verbatim. Prompt 2 arrived cut off mid-sentence; it is recorded as
+received.
+
+1. @prd/account-security.md @plans/account-security.md
+
+   Implement Phase 7 only: Sign Out Other Devices.
+
+   Follow the approved PRD and tracer-bullet implementation plan,
+   especially the Phase 7 user stories and acceptance criteria.
+
+   Allow authenticated customers, employees, and administrators to sign
+   out their other active sessions from the Account Security Center
+   without signing out their current browser.
+
+   Requirements:
+   - Add a Devices card to the Security overview with a "Sign out other
+     devices" action.
+   - Require the user's current password before performing the action.
+   - Use a per-user session salt or version mechanism, as specified in the
+     approved plan, to invalidate the user's other sessions.
+   - Keep the current browser signed in by updating its authentication
+     session hash.
+   - Do not change the user's password or email address.
+   - Do not affect sessions belonging to other users.
+   - Require authentication, CSRF protection, and a POST request for the
+     actual sign-out action.
+   - Show a clear success message after completion.
+   - Preserve all functionality from Phases 1–6.
+
+   Add automated tests covering invalid passwords, current-session
+   preservation, other-session invalidation, user isolation,
+   customer/staff/admin access, anonymous access, and any relevant Phase 7
+   security edge cases.
+
+   Run the full pytest suite, Ruff lint and formatting checks, Django
+   system checks, and migration checks.
+
+   Review every Phase 7 acceptance criterion and give me clear
+   instructions for testing the feature manually in two separate browser
+   sessions.
+
+   Do not commit anything yet.
+
+   Preserve my modified db.sqlite3 and all local test accounts. I want to
+   review and manually test Phase 7 before committing.
+2. Phase 7 implementation is complete, and I approve moving forward
+   without additional manual browser testing.
+
+   I visually verified that the Security page displays the Devices card
+   and its "Sign out of all other devices" button.
+
+   I am choosing to skip the two-browser manual test because automated
+   tests already cover session invalidation and current-session
+   preservation.
+
+   Please document this accurately in PROMPTS.md. Do not claim that the
+   skipped manual tests passed.
+
+   Include the exact prompts, implementation summary, automated
+   verification, migration details, issues, and deviations.
+
+   Run the full pytest suite, Ruff checks, Django system checks, and
+   migration checks.
+
+   Review git status and stage only the intended Phase
+
+### Summary
+- **Outcome:** "Sign out of all other devices" is now available from the
+  Security page, for customers, staff, and admin alike.
+  - `accounts/models.py`: `User` gains `session_salt`, a
+    `CharField(max_length=32, editable=False)` whose callable default,
+    `new_session_salt()`, returns `secrets.token_hex(16)`. Because it is not
+    editable, it never appears in the Django admin. `get_session_auth_hash()`
+    and `get_session_auth_fallback_hash()` (the `SECRET_KEY_FALLBACKS`
+    variant) both return an HMAC-SHA256 of `"<password hash>:<salt>"`, so
+    the session hash still changes with the password and now also with the
+    salt. `sign_out_other_sessions()` gives the user a new salt and saves
+    only that field.
+  - `accounts/forms.py`: the current-password field and its check moved
+    out of `ChangeEmailForm` into a new `CurrentPasswordForm` base, built
+    for one user. `SignOutOtherDevicesForm` is that base with nothing
+    added, so it asks only for the current password. `ChangeEmailForm` now
+    subclasses the base and sets `field_order = ["email",
+    "current_password"]` so its fields stay in the same order. The error
+    text is unchanged: "Your current password was entered incorrectly.
+    Please enter it again."
+  - `accounts/views.py`: `SignOutOtherDevicesView` is `LoginRequiredMixin` +
+    `FormView` and hands the form `request.user`. A GET only shows the
+    confirmation form. A valid POST calls `sign_out_other_sessions()`, then
+    `update_session_auth_hash(request, user)`, which stores the new hash in
+    this session and cycles its session key. It then redirects to
+    `accounts:security` with "You've been signed out of all other
+    devices." No email is sent. CSRF protection is Django's middleware, as
+    for every other form.
+  - `accounts/urls.py`: `security/devices/` → `accounts:sign_out_other_devices`.
+  - `templates/accounts/security.html`: a third **Devices** card with a
+    "Sign out of all other devices" button.
+  - `templates/accounts/sign_out_other_devices.html`: a new confirmation
+    page, built like the change-password page. It explains that this
+    browser stays signed in and the password won't change, shows the
+    current-password field with per-field errors, and links back to
+    Security.
+  - `CLAUDE.md`: the `accounts/` description notes the per-user
+    `session_salt` and `sign_out_other_sessions`.
+- **Migration:** `accounts/migrations/0005_user_session_salt.py`, written by
+  hand.
+  - `AddField` adds `session_salt` with the callable default. Django
+    evaluates that default once for an `AddField`, so on its own every
+    existing user would get the same value. A `RunPython` step,
+    `give_each_user_their_own_salt`, then gives each existing user a fresh
+    `secrets.token_hex(16)`. Its reverse is a no-op; reversing the
+    migration drops the column.
+  - The field stays `NOT NULL`, with no nullable intermediate step.
+  - Side effect: changing how the session hash is computed signs out every
+    session that existed before the migration, for every user, once.
+    Passwords are unaffected, so users just sign in again. The hash-based
+    design in the PRD can't avoid this.
+  - `makemigrations --check --dry-run` reports no changes, so the
+    hand-written migration matches the model.
+  - The developer applied `0005` to their local `db.sqlite3` themselves
+    before the visual check; `showmigrations` shows it applied. The agent
+    did not run `migrate`, `seed`, or anything else against that database.
+- **Automated tests:** `accounts/test_sign_out_other_devices.py` adds 32
+  tests. Each "device" is a separate Django test `Client`, signed in on
+  its own. They cover:
+  - every new user and every seeded user gets a distinct, non-empty salt,
+    and a seeded customer still signs in
+  - the migration gives three pre-existing users three distinct salts, and
+    a user created before the migration still signs in afterwards (these
+    two use `MigrationExecutor`, like the Phase 1 migration tests)
+  - a new salt changes the session hash but not the password hash, and a
+    new password still changes the session hash
+  - `session_salt` does not appear on the admin user-change page
+  - the Security page has the Devices card, the button text, and the link
+  - signed-out GET is redirected to login with `next`; a signed-out POST
+    changes no salt and signs nobody out
+  - customer, staff, and admin each get the form with only
+    `current_password`, and each can sign out their other devices
+  - a GET alone signs nobody out
+  - a POST without a CSRF token (`enforce_csrf_checks=True`) gets a 403 and
+    signs nobody out
+  - a wrong, empty, or other user's password shows a field error, keeps the
+    salt, keeps both devices signed in, and sends no email; the exact error
+    text is shown
+  - success redirects to Security with the message
+  - the confirming device stays signed in (with a fresh session key) and
+    two other devices of the same user are redirected to login on their
+    next request; a signed-out device can sign in again
+  - other users' sessions and salts are untouched, and extra `user` /
+    `username` POST fields have no effect
+  - the password, email, and outbox are unchanged
+  - a reset link issued before the action still validates and opens the
+    set-password form
+  - running the action twice keeps the confirming device signed in
+  - a Phase 5 password change still signs out other devices
+
+  `accounts/test_email_identity.py` changed one line: its migration tests'
+  `AFTER` target moved from `0004` to `0005`. Those tests migrate back and
+  forth; finishing at `0004` would leave the test database without the new
+  column for every test after them.
+
+  Final checks (run again after this entry was written): the full suite
+  passed 489 tests (457 from Phases 1–6 plus 32 new); `ruff check`,
+  `ruff format --check`, `manage.py check`, and
+  `makemigrations --check --dry-run` were all clean.
+- **Manual verification:** the developer visually confirmed that the
+  Security page shows the Devices card and its "Sign out of all other
+  devices" button. The developer **chose to skip** the two-browser test the
+  agent described (wrong password rejected, confirming browser stays
+  signed in, the other browser sent to login, the same password still
+  working, no console email, repeated for staff and admin, signed-out
+  direct visit). Those steps were **not performed**. Session invalidation
+  and current-session preservation are covered only by the automated
+  tests above.
+- **Deviations:** none from the plan's acceptance criteria. No follow-up
+  questions were asked. Choices the PRD and prompts left open:
+  - Prompt 1 called the action "Sign out other devices". The card button
+    and page title use the PRD's wording, "Sign out of all other devices";
+    the form's submit button reads "Sign out other devices".
+  - The PRD says to override `get_session_auth_hash()`. The agent also
+    overrode `get_session_auth_fallback_hash()`, so sessions keep working
+    while a `SECRET_KEY` is being rotated. It didn't override Django's
+    private `_get_session_auth_hash`. The HMAC key salt is
+    `"accounts.User.get_session_auth_hash"`, not Django's own string.
+  - The current-password check was moved into a shared
+    `CurrentPasswordForm` base. That touches Phase 6's `ChangeEmailForm`,
+    with its behavior, field order, and error text unchanged; all Phase 6
+    tests still pass.
+  - One Phase 1 test constant changed, as described above.
+  - Prompt 2 was cut off at "stage only the intended Phase". The agent
+    read it as: stage only the Phase 7 files and this file, leave
+    `db.sqlite3` out, and don't commit. No commit was made.
+- **Sideways:**
+  - **Escaped apostrophe:** the first full accounts run failed one test.
+    The success message was on the page, but Django's autoescaping had
+    rendered the apostrophe as `&#x27;`. The test now compares against
+    `escape(SUCCESS_MESSAGE)`.
+  - **Reset-link test order:** the test for "a reset link issued before
+    still works" first failed: the token was rejected. The cause was the
+    test, not the feature. It issued the token and only then signed a
+    client in, and `force_login` updates `last_login`, which Django builds
+    reset tokens from. Any sign-in invalidates outstanding reset links,
+    with or without Phase 7. The test now signs in first, then issues the
+    token, then signs out the other devices, which matches the real flow.
+  - **Messy first draft:** the first version of the two migration tests had
+    leftover lines (a redundant model alias and a password hash computed
+    twice). The agent cleaned these up, using `make_password`, before the
+    first run.
+  - **Phase 1 migration tests:** the agent noticed before the first run
+    that they would end at `0004` and break later tests, and changed their
+    target to `0005`.
+  - `ruff format` reformatted the new test file on the first full check.
+    The checks were run again after that and passed.
+  - **CRLF slip, repeated:** the agent edited seven existing files with a
+    text-mode Python script, which wrote CRLF line endings on Windows —
+    the same slip as Phases 4–5, which Phase 6 had avoided. It was caught
+    with `git ls-files --eol` while preparing this entry, after the first
+    full checks. All seven were converted back to LF; the diff stat was
+    unchanged, and the final checks ran on the LF files.
+  - `db.sqlite3` was already modified before the session. Its only change
+    during the session was the developer's own `migrate`. It was not
+    staged.
+
 ## 2026-10-11 — Account Security Center Phase 6: change email
 
 ### Prompts

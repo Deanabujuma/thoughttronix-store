@@ -20,8 +20,11 @@ A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platfo
 - `accounts/` — custom user model (`accounts.User`, `AbstractUser` + nullable
   `job_title`). Email is required at signup, stored lowercase on every save,
   and unique case-insensitively (blank emails allowed for staff/admin); login
-  stays username-only. Roles are Django's own vocabulary: customers are plain users,
-  employees are `is_staff`, the admin is `is_superuser`. No role field, no Groups.
+  stays username-only. A per-user `session_salt` is mixed into the session
+  auth hash; rotating it (`sign_out_other_sessions`) is how "Sign out of all
+  other devices" ends every other session without changing the password.
+  Roles are Django's own vocabulary: customers are plain users, employees
+  are `is_staff`, the admin is `is_superuser`. No role field, no Groups.
 - `products/` — catalog (`Category`, `Product`, `Tag`), its back-office CRUD,
   and the `seed` command
 - `orders/` — cart, checkout, orders, discount codes (`Coupon`), and

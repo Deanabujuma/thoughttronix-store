@@ -91,20 +91,13 @@ class ChangePasswordForm(PasswordChangeForm):
             field.widget.attrs["class"] = "input w-full"
 
 
-class ChangeEmailForm(forms.Form):
-    """Change the signed-in user's email, authorized by their current password.
+class CurrentPasswordForm(forms.Form):
+    """A form for one user, authorized by that user's current password.
 
-    The new email follows the signup rules: required, lowercased, and
-    unique in any capitalization — the user's own account aside, so
-    re-entering their address in other capitals is fine. Like Django's
-    password forms, it is built for one user and only ever saves that one.
+    Like Django's password forms, it is built for ``user`` — the view hands
+    it ``request.user`` — and only ever acts on that one account.
     """
 
-    email = forms.EmailField(
-        label="New email address",
-        max_length=User._meta.get_field("email").max_length,
-        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
-    )
     current_password = forms.CharField(
         label="Current password",
         strip=False,
@@ -116,6 +109,39 @@ class ChangeEmailForm(forms.Form):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs["class"] = "input w-full"
+
+    def clean_current_password(self) -> str:
+        password = self.cleaned_data["current_password"]
+        if not self.user.check_password(password):
+            raise forms.ValidationError(
+                "Your current password was entered incorrectly. Please enter it again.",
+                code="password_incorrect",
+            )
+        return password
+
+
+class SignOutOtherDevicesForm(CurrentPasswordForm):
+    """Confirm "Sign out of all other devices" with the current password.
+
+    The password is all it asks for; the view does the signing out.
+    """
+
+
+class ChangeEmailForm(CurrentPasswordForm):
+    """Change the signed-in user's email, authorized by their current password.
+
+    The new email follows the signup rules: required, lowercased, and
+    unique in any capitalization — the user's own account aside, so
+    re-entering their address in other capitals is fine.
+    """
+
+    email = forms.EmailField(
+        label="New email address",
+        max_length=User._meta.get_field("email").max_length,
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+    )
+
+    field_order = ["email", "current_password"]
 
     @staticmethod
     def duplicate_email_error() -> forms.ValidationError:
@@ -130,15 +156,6 @@ class ChangeEmailForm(forms.Form):
         if others.filter(email__iexact=email).exists():
             raise self.duplicate_email_error()
         return email
-
-    def clean_current_password(self) -> str:
-        password = self.cleaned_data["current_password"]
-        if not self.user.check_password(password):
-            raise forms.ValidationError(
-                "Your current password was entered incorrectly. Please enter it again.",
-                code="password_incorrect",
-            )
-        return password
 
     def save(self) -> bool:
         """Save the new email; return whether it was saved.

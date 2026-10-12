@@ -183,7 +183,8 @@ def test_seed_gives_every_user_a_unique_lowercase_email(db):
 # --- Data migration ------------------------------------------------------------
 
 BEFORE = [("accounts", "0002_address")]
-AFTER = [("accounts", "0004_unique_lowercase_email")]
+# The latest state, so the real User model's columns all exist afterwards.
+AFTER = [("accounts", "0005_user_session_salt")]
 
 
 def _migrate(targets):
