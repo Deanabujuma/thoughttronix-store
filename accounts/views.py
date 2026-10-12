@@ -4,6 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import (
     LoginView,
     LogoutView,
+    PasswordChangeView,
     PasswordResetConfirmView,
     PasswordResetDoneView,
     PasswordResetView,
@@ -26,6 +27,7 @@ from django.views.generic import (
 
 from .forms import (
     AddressForm,
+    ChangePasswordForm,
     NewPasswordForm,
     PasswordResetRequestForm,
     SignInForm,
@@ -68,6 +70,26 @@ class SecurityView(LoginRequiredMixin, TemplateView):
     """The Security overview: one page for every signed-in user, any role."""
 
     template_name = "accounts/security.html"
+
+
+class ChangePasswordView(LoginRequiredMixin, PasswordChangeView):
+    """Change the signed-in user's own password, then send the notice.
+
+    Django's view checks the current password, saves the new one, and
+    calls ``update_session_auth_hash`` so this session survives. Every
+    other session was signed in under the old password hash, so it fails
+    Django's hash check on its next request.
+    """
+
+    form_class = ChangePasswordForm
+    template_name = "accounts/password_change.html"
+    success_url = reverse_lazy("accounts:security")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, "Your password has been changed.")
+        send_password_changed_notice(self.request, form.user)
+        return response
 
 
 # --- Password reset ---------------------------------------------------------

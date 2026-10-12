@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import (
     AuthenticationForm,
+    PasswordChangeForm,
     PasswordResetForm,
     SetPasswordForm,
     UserCreationForm,
@@ -66,6 +67,21 @@ class NewPasswordForm(SetPasswordForm):
 
     The stock form checks the two entries match and runs the new password
     through ``AUTH_PASSWORD_VALIDATORS``.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs["class"] = "input w-full"
+
+
+class ChangePasswordForm(PasswordChangeForm):
+    """Django's password-change form, dressed in DaisyUI.
+
+    The stock form checks the current password, checks the two new entries
+    match, and runs the new password through ``AUTH_PASSWORD_VALIDATORS``.
+    It only ever changes the password of the user it was built for — the
+    view hands it ``request.user``.
     """
 
     def __init__(self, *args, **kwargs):

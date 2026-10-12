@@ -28,6 +28,157 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-11 — Account Security Center Phase 5: change password
+
+### Prompts
+Phase 5 ran in one agent session, which began after `/clear`. Prompt text
+is verbatim.
+
+1. @prd/account-security.md @plans/account-security.md
+
+   Implement Phase 5 only: Change Password.
+
+   Follow the approved PRD and tracer-bullet implementation plan,
+   especially the Phase 5 user stories and acceptance criteria.
+
+   Allow authenticated customers, employees, and administrators to change
+   their own passwords from the Account Security Center.
+
+   Requirements:
+   - Add a Password card to the Security overview with a working Change
+     password link.
+   - Use Django's built-in PasswordChangeView and PasswordChangeForm with
+     DaisyUI styling.
+   - Require the user's current password.
+   - Require and confirm a new password that satisfies the existing Django
+     password validators.
+   - Show helpful validation errors for an incorrect current password,
+     weak new passwords, and mismatched passwords.
+   - After a successful change, redirect to the Security overview with a
+     clear success message.
+   - Preserve the current user's authenticated session using Django's
+     update_session_auth_hash.
+   - Invalidate other existing sessions through Django's normal password
+     hash behavior.
+   - Send a password-changed notification through the console email
+     backend, reusing the Phase 4 notification helper.
+   - Never include passwords in notifications.
+   - Require authentication and prevent users from changing another user's
+     password.
+   - Preserve all functionality from Phases 1–4.
+
+   Create automated tests for these behaviors and run the full pytest
+   suite, Ruff checks, Django system checks, and migration checks.
+
+   Review Phase 5's acceptance criteria and give me clear browser-testing
+   instructions.
+
+   Do not implement Phases 6–7. Do not commit anything yet.
+
+   Preserve my modified db.sqlite3 and local test accounts. I want to
+   manually test Phase 5 and review the changes before committing.
+2. Phase 5 manual browser testing is complete and passed.
+
+   I verified:
+   - The Change Password form displays correctly.
+   - An incorrect current password is rejected.
+   - A valid new password successfully changes the account password.
+   - The Security page displays the success message.
+   - My current browser stays signed in.
+   - The password-changed notification appears in the Django console.
+   - A second signed-in Incognito session is signed out after the password
+     change.
+
+   Please update PROMPTS.md with the Phase 5 session history, including the
+   exact prompts, implementation summary, automated tests, manual
+   verification, and any issues or deviations.
+
+   Run the full pytest suite, Ruff checks, Django system checks, and
+   migration checks.
+
+   Review git status and stage only the intended Phase 5 files and
+   PROMPTS.md.
+
+   Preserve my modified db.sqlite3 and all local test accounts.
+
+   Show me the staged files and test results before committing. Do not
+   commit anything or begin Phase 6 until I approve.
+
+### Summary
+- **Outcome:** Change password is now available from the Security page.
+  - `accounts/forms.py`: `ChangePasswordForm` is Django's
+    `PasswordChangeForm` with DaisyUI `input w-full` widgets. The stock
+    form checks the current password and the confirmation, and runs
+    `AUTH_PASSWORD_VALIDATORS`.
+  - `accounts/views.py`: `ChangePasswordView` is
+    `LoginRequiredMixin` + Django's `PasswordChangeView`. It sends the user
+    to `accounts:security` and flashes "Your password has been changed.".
+    It then sends the notice with Phase 4's `send_password_changed_notice`,
+    which calls `User.send_security_notice`. Django's view already calls
+    `update_session_auth_hash`, so this session survives. Every other
+    session fails Django's password-hash check on its next request. The
+    URL has no user id and the form is built for `request.user`, so a user
+    can only change their own password.
+  - `accounts/urls.py`: `security/password/` → `accounts:password_change`.
+  - `templates/accounts/security.html`: a **Password** card with a
+    "Change password" button.
+  - `templates/accounts/password_change.html`: a new page with current,
+    new, and confirm fields; per-field errors and help text; and a link
+    back to Security.
+  - No model change and no migration.
+- **Automated tests:** `accounts/test_password_change.py` adds 22 tests.
+  They cover:
+  - the card's link
+  - signed-out GET and POST redirected to login with `next`, and the
+    password unchanged
+  - customer, staff, and admin each get the styled form, and staff and
+    admin can complete a change
+  - extra `user`/`username` POST fields are ignored, and another user's
+    password does not count as the current password
+  - field errors for a wrong current password, a mismatch, a too-short
+    password, a common all-numeric password, and a password too like the
+    email; each leaves the password unchanged and sends no email
+  - the redirect to Security with the success message
+  - the new password works and the old one doesn't
+  - this client stays signed in while a second client is redirected to
+    login
+  - exactly one plain-text notice to the current email, with the date and
+    the reset-page link, and no passwords or `/reset/` link
+  - a user with no email changes their password and no email is sent
+
+  Before and after the line-ending fix, the full suite passed 427 tests. `ruff check`,
+  `ruff format --check`, `manage.py check`, and
+  `makemigrations --check --dry-run` were all clean.
+- **Manual verification (developer, in the browser):** the form displays
+  correctly; a wrong current password is rejected; a valid new password
+  changes the password; the Security page shows the success message; the
+  current browser stays signed in; the notice appears in the Django
+  console; and a second signed-in Incognito session is signed out after
+  the change.
+- **Deviations:** none from the PRD, the plan, or the prompts. No follow-up
+  questions were asked. Two small choices the prompts left open:
+  - The view adds `LoginRequiredMixin` even though `PasswordChangeView`
+    already requires login. The PRD names that mixin for every non-reset
+    view, and it matches the other Security views.
+  - The success message wording is "Your password has been changed.". The
+    PRD asked only for "a confirmation message".
+- **Sideways:**
+  - **Line endings, a repeat of Phase 4's slip:** the agent edited
+    `accounts/forms.py`, `accounts/urls.py`, `accounts/views.py`, and
+    `templates/accounts/security.html` with an inline Python script. The
+    script wrote in text mode, so Windows saved CRLF line endings. The
+    encoding stayed valid UTF-8 and no text changed. The new test file and
+    the `password_change.html` template were written as LF. This was
+    caught before staging. A first `grep` check for `\r` gave false
+    positives on untouched files, so the agent used
+    `git ls-files --eol` instead. That showed `w/crlf` for exactly those
+    four files. They were rewritten byte for byte as LF, and the full
+    checks were run again afterward. The Phase 1–4 suite was not affected.
+    The Phase 4 entry had already recorded this pitfall, but the agent
+    still used a text-mode script for its first edits.
+  - `db.sqlite3` was already modified before the session. It was neither
+    changed nor staged. The tests run on pytest's own test database.
+
 ## 2026-10-11 — Account Security Center Phase 4: password reset confirmation and completion
 
 ### Prompts

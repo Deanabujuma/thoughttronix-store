@@ -20,5 +20,15 @@
         {% endif %}
       </div>
     </article>
+
+    <article class="card bg-base-100 shadow-md">
+      <div class="card-body">
+        <h2 class="card-title">Password</h2>
+        <p class="text-sm opacity-70">Changing your password keeps you signed in here and signs you out everywhere else.</p>
+        <div class="card-actions mt-2">
+          <a href="{% url 'accounts:password_change' %}" class="btn btn-primary btn-sm">Change password</a>
+        </div>
+      </div>
+    </article>
   </div>
 {% endblock %}
