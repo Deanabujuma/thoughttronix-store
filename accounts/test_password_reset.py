@@ -10,9 +10,11 @@ from http import HTTPStatus
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.core.mail.backends import console
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from django.utils.module_loading import import_string
 from environs import env
 
 import config.settings
@@ -226,4 +228,5 @@ def test_email_still_goes_to_the_console(reload_settings):
     # pytest-django swaps in locmem for tests, so read the settings module.
     module = reload_settings()
 
-    assert module.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend"
+    backend = import_string(module.EMAIL_BACKEND)
+    assert issubclass(backend, console.EmailBackend)

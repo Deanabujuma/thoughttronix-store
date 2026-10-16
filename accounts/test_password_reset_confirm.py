@@ -1,6 +1,7 @@
 """Password reset, confirm side: the new password, dead links, the notice."""
 
 import email
+import io
 import re
 from datetime import datetime, timedelta
 from email import policy
@@ -14,6 +15,7 @@ from django.test import Client
 from django.urls import reverse
 
 from accounts.test_password_reset import link_in, request_reset, reset_link
+from config.mail import EmailBackend
 
 User = get_user_model()
 
@@ -171,9 +173,11 @@ def test_a_reset_signs_out_existing_sessions(client, dana):
 # --- The link as delivered -------------------------------------------------
 #
 # A link at the dev server's host runs past 78 characters, so the email goes
-# out quoted-printable and the console backend prints it with a soft line
-# break: the raw text has an "=" and a newline inside the token. These tests
-# read the link back the way a mail client does, from the encoded bytes.
+# out quoted-printable: on the wire it has an "=" soft break inside the token.
+# Django's stock console backend printed exactly that, so a link copied from
+# the terminal was broken; the project's backend (config/mail.py) prints the
+# body as written. These tests read the link back the way a mail client
+# does, from the encoded bytes, and the way a developer does, from the console.
 
 DEV_HOST = "127.0.0.1:8000"
 
@@ -186,7 +190,7 @@ def delivered_link(message):
 
 
 def test_a_long_link_is_wrapped_on_the_wire(client, dana, mailoutbox):
-    """Pins the cause of the console's "=" line breaks, so it stays explained."""
+    """Pins why the console needs its own backend, so it stays explained."""
     client.post(
         reverse("accounts:password_reset"),
         {"email": "dana@example.com"},
@@ -225,6 +229,65 @@ def test_a_link_read_from_the_delivered_email_resets_the_password(
     )
 
     assert done.redirect_chain[0][0] == reverse("accounts:login")
+    assert SUCCESS_MESSAGE in done.content.decode()
+    assert client.login(username="dana", password=NEW_PASSWORD)
+
+
+def test_the_console_prints_the_link_whole(client, dana, mailoutbox):
+    client.post(
+        reverse("accounts:password_reset"),
+        {"email": "dana@example.com"},
+        HTTP_HOST=DEV_HOST,
+    )
+    console = io.StringIO()
+    EmailBackend(stream=console).send_messages(mailoutbox)
+    printed = console.getvalue()
+
+    assert "quoted-printable" not in printed
+    assert link_in(mailoutbox[0]) in printed.splitlines()
+    assert "— The ThoughtTronix Store" in printed
+
+
+def test_a_console_that_cant_show_a_character_still_prints_the_link(
+    client, db, mailoutbox
+):
+    User.objects.create_user(
+        username="李明", email="li@example.com", password=OLD_PASSWORD
+    )
+    client.post(
+        reverse("accounts:password_reset"),
+        {"email": "li@example.com"},
+        HTTP_HOST=DEV_HOST,
+    )
+    raw = io.BytesIO()
+    cp1252_console = io.TextIOWrapper(raw, encoding="cp1252")
+    EmailBackend(stream=cp1252_console).send_messages(mailoutbox)
+    cp1252_console.flush()
+
+    assert link_in(mailoutbox[0]) in raw.getvalue().decode("cp1252")
+
+
+def test_a_link_copied_from_the_console_resets_the_password(client, dana, mailoutbox):
+    client.post(
+        reverse("accounts:password_reset"),
+        {"email": "dana@example.com"},
+        HTTP_HOST=DEV_HOST,
+    )
+    console = io.StringIO()
+    EmailBackend(stream=console).send_messages(mailoutbox)
+    link = re.search(r"https?://\S+", console.getvalue()).group()
+
+    form = client.get(
+        link.removeprefix(f"http://{DEV_HOST}"), HTTP_HOST=DEV_HOST, follow=True
+    )
+    assert form.redirect_chain[0][1] == HTTPStatus.FOUND  # no 301 detour
+    done = client.post(
+        form.redirect_chain[-1][0],
+        {"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD},
+        HTTP_HOST=DEV_HOST,
+        follow=True,
+    )
+
     assert SUCCESS_MESSAGE in done.content.decode()
     assert client.login(username="dana", password=NEW_PASSWORD)
 

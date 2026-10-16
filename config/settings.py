@@ -160,8 +160,10 @@ TAILWIND_CLI_SRC_CSS = "assets/css/source.css"
 
 
 # Email — console backend only; real mail is out of scope for the core.
+# The project's console backend prints bodies unwrapped, so a reset link
+# copied from the terminal works (see config/mail.py).
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = "config.mail.EmailBackend"
 
 DEFAULT_FROM_EMAIL = env.str(
     "DEFAULT_FROM_EMAIL",

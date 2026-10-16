@@ -28,6 +28,101 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-16 — Account Security fix: reset links copied from the console work
+
+### Prompts
+One agent session. Prompt text is verbatim. Prompt 1 started a wishlist
+design interview that was paused after its first question when prompt 2
+arrived; no wishlist code or documentation was written.
+
+1. /grill-me ThoughtTronix wants customers to have one private wishlist
+   each. Signed-in customers should be able to save or remove products
+   from their wishlist on the product detail page without a full-page
+   reload. The button should update to reflect whether the product is
+   saved. Customers must only access and modify their own wishlist.
+   Multiple, named, and shared wishlists are out of scope. Help me make the
+   design decisions using existing ThoughtTronix patterns. Do not write
+   code or documentation yet.
+2. My professor reviewed Homework 6 (Account Security) and reported that
+   the password reset link fails in the terminal. Investigate the existing
+   password reset implementation and identify the root cause. Fix the
+   issue using the project's existing conventions without changing
+   unrelated features. Run the relevant tests and Ruff checks. Then give me
+   step-by-step instructions to manually verify the complete password
+   reset process in the browser. Do not commit or push changes yet. Do not
+   modify or reset db.sqlite3.
+3. I completed manual browser verification of the Homework 6 Account
+   Security fix. The password reset link opened successfully, the new
+   password was accepted, and the password-change notification appeared. I
+   also verified that signing out of other devices invalidated the
+   InPrivate browser session while keeping my regular browser session
+   active.
+
+   Please review the changes, run the relevant tests and Ruff checks, and
+   update PROMPTS.md using its existing format. Then commit the completed
+   Account Security fix and push it to GitHub.
+
+   Do not include db.sqlite3 in the commit because it was already modified
+   before this session. Do not reset or delete the database. Do not
+   include unrelated changes. Show me the final Git status and latest
+   commit.
+
+### Summary
+- **Outcome:** a password-reset link printed on the console can now be
+  copied straight into the browser.
+  - **Root cause:** at host `127.0.0.1:8000` the reset link is 80
+    characters (Django's token alone is 39). Python's email library, which
+    Django 6 uses, sends any body line over 78 characters as
+    quoted-printable, and Django's stock console backend prints the email
+    as encoded for the wire. The link therefore appeared with an `=` soft
+    break inside the token. Copying the first line gave a cut-off token
+    with no trailing slash: a 301, then "Invalid reset link". The reset
+    logic itself was correct. Removing the email's non-ASCII em dash would
+    not have helped, because the link line alone is long enough.
+  - `config/mail.py` (new): `EmailBackend` subclasses Django's console
+    backend and prints each message under an email policy with no line
+    limit that allows 8-bit text, so the body prints exactly as written.
+    This applies to every email: reset, password-changed, and
+    email-changed. Characters the terminal's encoding can't show are
+    replaced instead of raising, because the plain-text output (unlike
+    quoted-printable, which is pure ASCII) could otherwise crash a request
+    on a cp1252 Windows console. Links are ASCII, so they always print
+    intact.
+  - `config/settings.py`: `EMAIL_BACKEND = "config.mail.EmailBackend"`.
+    Email still goes only to the console, as the PRD requires.
+  - `CLAUDE.md`: the `EMAIL_BACKEND` note now names the project's console
+    subclass.
+  - Tests: three new tests in `accounts/test_password_reset_confirm.py`.
+    The console prints the link whole on one line; a link copied from the
+    console output resets the password with no 301 detour; and a cp1252
+    stream still gets the link for a username it can't encode. The
+    settings test now checks that the backend is a console backend
+    subclass instead of the stock dotted path. The comments on the existing
+    wire-format tests were updated; those tests still pass unchanged.
+  - Verification: 492 tests passed; `ruff check` and `ruff format --check`
+    were clean. `db.sqlite3` was already modified before the session and
+    was not touched; every reproduction used an in-memory database.
+  - Manual browser verification (prompt 3, reported by the developer): the
+    reset link opened, the new password was accepted, and the
+    password-changed notice appeared. Signing out of other devices ended
+    the InPrivate session and kept the regular browser signed in.
+- **Deviations:** the Phase 4 session had chosen not to build a custom
+  backend because `CLAUDE.md` says `EMAIL_BACKEND` is always the console
+  backend. This session read a subclass of the console backend as still
+  meeting that rule, and updated the `CLAUDE.md` line to say so.
+- **Sideways:**
+  - The agent first suspected the em dash. Running the real reset view
+    showed the 80-character link forces quoted-printable on its own, so the
+    fix moved from the template to the backend.
+  - The first fix printed the em dash as `�` in the agent's cp1252 shell,
+    which exposed the crash risk above. The encoding guard and its test
+    were added in response.
+  - The agent's first check that the new cp1252 test fails without the
+    guard was invalid: the test was missing the `db` fixture and failed
+    for that reason instead. The full suite caught it. After the fixture
+    was added, the check was rerun: without the guard the test fails with
+    `UnicodeEncodeError`, and with the guard it passes.
+
 ## 2026-10-11 — Account Security Center Phase 7: sign out of all other devices
 
 ### Prompts

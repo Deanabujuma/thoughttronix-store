@@ -52,7 +52,9 @@ managers/querysets, forms own their validation. Settings read from `.env`
 via environs with working defaults — the app must run with no `.env` present.
 These include `DEFAULT_FROM_EMAIL` (default
 `ThoughtTronix <no-reply@thoughttronix.example>`) and `PASSWORD_RESET_TIMEOUT`
-(seconds, default `3600`); `EMAIL_BACKEND` is always the console backend.
+(seconds, default `3600`); `EMAIL_BACKEND` is always the console backend —
+the project's subclass in `config/mail.py`, which prints bodies unwrapped so
+links copied from the terminal work.
 
 ## Template conventions
 
