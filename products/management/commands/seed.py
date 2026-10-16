@@ -9,14 +9,14 @@ Demo logins (documented in the README):
     admin / admin123        superuser
     employee / employee123  staff, "Junior Thought Curator"
     customer / customer123  a plain customer, with order history, a live
-                            cart, and two saved addresses
+                            cart, a wishlist, and two saved addresses
 
 Discount codes: THOUGHTS10 (live, whole order), HUB15 (live, Seraphine
 hubs), SUMMER20 (expired), LAUNCH25 (retired). Some seeded orders used them.
 """
 
 import random
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -28,6 +28,7 @@ from django.utils.text import slugify
 from accounts.models import Address
 from orders.models import Cart, Coupon, Order, OrderItem
 from products.models import Category, Product, Tag
+from wishlist.models import Wishlist
 
 TAGS = [
     "always listening",
@@ -475,6 +476,18 @@ CUSTOMER_CART = [
     ("whisper-alarm-clock", 1),
 ]
 
+# The customer demo login's wishlist: (product slug, when it was saved).
+# Fixed timestamps, not offsets from now, so every run stores the same
+# values and the newest-first order never changes. EchoPatch is unavailable
+# — saved before it was pulled — so the list page and the "saved but
+# unavailable" button state show straight away.
+CUSTOMER_WISHLIST = [
+    ("mindsync-duo", datetime(2026, 10, 14, 15, 0, tzinfo=UTC)),
+    ("pulse-halo", datetime(2026, 10, 11, 18, 30, tzinfo=UTC)),
+    ("recallpro", datetime(2026, 10, 4, 14, 15, tzinfo=UTC)),
+    ("echopatch", datetime(2026, 9, 15, 20, 45, tzinfo=UTC)),
+]
+
 # The customer demo login's visible order history: (days ago, status,
 # [(product slug, quantity), ...], discount code or None). Statuses follow
 # age, like the background orders, plus one recent order still in flight.
@@ -543,6 +556,7 @@ class Command(BaseCommand):
         self._create_catalog(tags)
         self._create_users()
         self._create_customer_cart()
+        self._create_customer_wishlist()
         self._create_customer_addresses()
         self._create_coupons()
         self._create_orders()
@@ -555,8 +569,8 @@ class Command(BaseCommand):
                 f"{get_user_model().objects.count()} users, "
                 f"{Order.objects.count()} orders, "
                 f"{Coupon.objects.count()} discount codes, "
-                f"and a live cart and {Address.objects.count()} saved addresses "
-                f"for 'customer'."
+                f"and a live cart, a {len(CUSTOMER_WISHLIST)}-item wishlist, and "
+                f"{Address.objects.count()} saved addresses for 'customer'."
             )
         )
 
@@ -565,6 +579,8 @@ class Command(BaseCommand):
         Order.objects.all().delete()
         Coupon.objects.all().delete()  # after orders: used codes are protected
         Cart.objects.all().delete()
+        # Deleting products empties every wishlist; this clears the rows too.
+        Wishlist.objects.all().delete()
         Product.objects.all().delete()
         Tag.objects.all().delete()
         Category.objects.all().delete()
@@ -626,6 +642,15 @@ class Command(BaseCommand):
         cart = Cart.for_user(customer)
         for slug, quantity in CUSTOMER_CART:
             cart.items.create(product=Product.objects.get(slug=slug), quantity=quantity)
+
+    def _create_customer_wishlist(self):
+        """Saved directly, not via save_product, so EchoPatch can be on it."""
+        customer = get_user_model().objects.get(username="customer")
+        wishlist = Wishlist.for_user(customer)
+        for slug, added_at in CUSTOMER_WISHLIST:
+            wishlist.items.create(
+                product=Product.objects.get(slug=slug), added_at=added_at
+            )
 
     def _create_customer_addresses(self):
         customer = get_user_model().objects.get(username="customer")

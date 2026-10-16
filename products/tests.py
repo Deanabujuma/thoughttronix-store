@@ -1,3 +1,5 @@
+import io
+from datetime import UTC, datetime
 from decimal import Decimal
 from http import HTTPStatus
 
@@ -9,7 +11,7 @@ from django.urls import reverse
 from django.utils.html import escape
 
 from orders.models import CartItem, Order, OrderItem
-from wishlist.models import Wishlist
+from wishlist.models import Wishlist, WishlistItem
 
 from .models import Category, Product, Tag
 
@@ -352,6 +354,8 @@ def test_seed_is_idempotent(db):
         CartItem.objects.count(),
         Order.objects.count(),
         OrderItem.objects.count(),
+        Wishlist.objects.count(),
+        WishlistItem.objects.count(),
     )
 
     call_command("seed")
@@ -363,6 +367,58 @@ def test_seed_is_idempotent(db):
         CartItem.objects.count(),
         Order.objects.count(),
         OrderItem.objects.count(),
+        Wishlist.objects.count(),
+        WishlistItem.objects.count(),
     )
 
     assert first == second
+
+
+def demo_wishlist():
+    """The demo customer's (slug, added_at) pairs, in the page's order."""
+    customer = get_user_model().objects.get(username="customer")
+    return [
+        (item.product.slug, item.added_at) for item in customer.wishlist.items.all()
+    ]
+
+
+def test_seed_gives_the_customer_a_demo_wishlist(db):
+    call_command("seed")
+
+    # Newest first, with EchoPatch — saved before it was pulled — last.
+    assert demo_wishlist() == [
+        ("mindsync-duo", datetime(2026, 10, 14, 15, 0, tzinfo=UTC)),
+        ("pulse-halo", datetime(2026, 10, 11, 18, 30, tzinfo=UTC)),
+        ("recallpro", datetime(2026, 10, 4, 14, 15, tzinfo=UTC)),
+        ("echopatch", datetime(2026, 9, 15, 20, 45, tzinfo=UTC)),
+    ]
+    unavailable = WishlistItem.objects.filter(product__is_available=False)
+    assert [item.product.slug for item in unavailable] == ["echopatch"]
+
+
+def test_seed_wishlist_is_identical_every_run(db):
+    """Same products, same order, and the very same added_at values."""
+    call_command("seed")
+    first = demo_wishlist()
+
+    call_command("seed")
+
+    assert demo_wishlist() == first
+
+
+def test_seed_leaves_only_the_demo_wishlist(other_customer, product):
+    """Every wishlist goes — even one whose owner the seed doesn't manage."""
+    Wishlist.for_user(other_customer).save_product(product)
+
+    call_command("seed")
+
+    customer = get_user_model().objects.get(username="customer")
+    assert list(Wishlist.objects.all()) == [customer.wishlist]
+
+
+def test_seed_success_message_mentions_the_wishlist(db):
+    output = io.StringIO()
+
+    call_command("seed", stdout=output)
+
+    assert "a 4-item wishlist" in output.getvalue()

@@ -28,6 +28,131 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-16 — Wishlist Phase 3: demo wishlist in seed
+
+### Prompts
+The same agent session as the Phases 1 and 2 entry below, which records
+prompts 1–15. Prompt text is verbatim. Prompt 1 approved the Phases 1–2
+commit; it is recorded here because that entry was already committed.
+
+1. I approve the proposed Wishlist Phases 1–2 commit and commit message.
+   Stage only the explicitly reviewed wishlist files, including the PRD,
+   plan, both skills, implementation code, templates, tests, and
+   PROMPTS.md. Do not use git add -A or git add .
+
+   Before committing, run git diff --cached --name-only and git diff
+   --cached --stat. Confirm the staged list contains exactly the intended
+   files and excludes db.sqlite3 and db.sqlite3.before-wishlist-backup. If
+   there is any unexpected file, stop and ask me before proceeding.
+
+   If the staged files are correct, commit the changes and push to
+   origin/main. Then show me git status, git log -1 --oneline, and
+   confirmation of the push. Do not start Phase 3 implementation yet.
+2. Go ahead and continue /implement for Wishlist Phase 3 using
+   @prd/wishlist.md and @plans/wishlist.md.
+
+   The Phase 3 TDD skip is approved. Implement only Phase 3: demo wishlist
+   seed data, fixed added_at timestamps, wipe behavior, success message,
+   README documentation, and automated tests for contents, order, wipe,
+   and repeatability.
+
+   Run seed only in the isolated test database. Do not run the seed
+   command against my development db.sqlite3, and do not modify, delete,
+   or reset db.sqlite3 or db.sqlite3.before-wishlist-backup.
+
+   Run the full test suite, Ruff lint, and formatting checks. Fix any
+   failures.
+
+   Then give me the manual verification instructions and STOP for my
+   approval, as required by /implement. Do not commit, push, or start the
+   product reviews homework yet.
+3. Phase 3 looks good, and I approve using isolated automated tests
+   instead of running seed against my personal development database.
+
+   Before final approval, please check the exact Phase 3 requirement in
+   prd/wishlist.md and plans/wishlist.md for added_at timestamps. If the
+   approved requirement calls for literal fixed timestamps, change the
+   demo wishlist timestamps to fixed timezone-aware calendar dates rather
+   than offsets from timezone.now(). Keep the newest-first order and all
+   other intended behavior.
+
+   Update tests as necessary, rerun the full pytest suite, Ruff lint, and
+   Ruff format checks. Do not run seed against db.sqlite3, and do not
+   touch the database backup or media files.
+
+   Then report the results and stop for my approval. Do not commit or push
+   yet.
+4. I approve Wishlist Phase 3. The corrected fixed UTC timestamps meet the
+   PRD and plan, all 552 tests pass, Ruff checks are clean, and I approve
+   isolated automated verification instead of running seed against my
+   development database.
+
+   Please complete /implement Step 5:
+   1. Add an accurate Phase 3 entry to PROMPTS.md using its existing
+   format.
+   2. Review git status and show me the exact files proposed for the Phase
+   3 commit, including PROMPTS.md.
+   3. Exclude db.sqlite3, db.sqlite3.before-wishlist-backup, media files,
+   and unrelated changes.
+   4. Stop and wait for my approval of the staged file list before
+   committing or pushing.
+
+   Do not start the product reviews homework yet.
+
+### Summary
+- **Outcome:** after `seed`, the demo `customer` login has a four-item
+  wishlist, and every run gives the same one.
+  - **Phases 1–2 commit (prompt 1):** the 26 reviewed files were staged by
+    path. `git diff --cached` confirmed no database files. The commit is
+    `17940cc` and was pushed to `origin/main`. The agent had earlier said
+    29 files; the real count was 26, all from the reviewed list. The
+    miscount was disclosed before committing.
+  - **TDD skipped:** `/tdd` found no candidates, because Phase 3 is only
+    seed data and documentation. The developer approved skipping it.
+  - **`products/management/commands/seed.py`:** `CUSTOMER_WISHLIST` lists
+    MindSync Duo, Pulse Halo and RecallPro, plus EchoPatch, which is
+    unavailable. Each has a fixed UTC `added_at`, from 2026-10-14 back to
+    2026-09-15. `_create_customer_wishlist()` creates the items directly,
+    because `save_product()` would refuse the unavailable EchoPatch.
+    `_wipe()` now deletes every `Wishlist` row after the carts. The success
+    message reports "a 4-item wishlist", and the module docstring mentions
+    the wishlist.
+  - **`README.md`:** the `customer` demo login now mentions the wishlist and
+    its unavailable item.
+  - **Tests (`products/tests.py`):**
+    - The exact `(slug, added_at)` pairs, newest first, with EchoPatch as
+      the only unavailable item.
+    - Identical values after running `seed` twice.
+    - Wishlist and item counts added to the idempotence test.
+    - Only the demo wishlist is left after seeding, even when a user the
+      seed doesn't manage had one. Removing the new wipe line made this
+      test fail; the line was then restored.
+    - The success message mentions the wishlist.
+    - The existing `test_seed_sends_nothing` still covers email.
+  - **Verification:** 552 tests passed; `ruff check` and
+    `ruff format --check` were clean. The developer approved automated
+    verification instead of a browser check (prompt 3).
+  - **Data safety:** `seed` ran only inside the test suite's own database.
+    `db.sqlite3`, `db.sqlite3.before-wishlist-backup` and `media/` kept
+    their earlier sizes and modification times.
+- **Deviations:**
+  - The browser check was replaced by automated tests, at the developer's
+    choice. `seed` deletes product images from `media/`, so a manual check
+    would have meant backing up both the database and `media/`.
+  - The `CLAUDE.md` project-layout update is still deferred, as the PRD
+    says.
+- **Sideways:**
+  - The first build dated the demo items as days before the moment `seed`
+    ran, the way seeded orders are dated. When reporting it, the agent
+    flagged that this differs from the PRD's "fixed `added_at` times". In
+    prompt 3 the developer asked for a check. The plan's acceptance
+    criterion ("The items' `added_at` values are fixed") requires literal
+    values, so the agent switched to fixed UTC datetimes. The repeatability
+    test now compares the stored values, not just the order. The agent
+    reasoned that this stronger test would have failed on the first
+    version, because the stored times include microseconds and differ
+    between runs, but did not run it against that version.
+
 ## 2026-10-16 — Wishlist Phases 1 and 2: save/remove button, wishlist page, /tdd and /implement skills
 
 ### Prompts
