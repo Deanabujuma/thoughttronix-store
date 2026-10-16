@@ -28,6 +28,215 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-16 — Wishlist Phases 1 and 2: save/remove button, wishlist page, /tdd and /implement skills
+
+### Prompts
+One agent session, which began after `/clear`. Prompt text is verbatim,
+except that the three pasted skill texts (prompts 3, 4 and 11) are not
+repeated here: prompt 3 held only the `tdd` frontmatter, and prompts 4 and
+11 are saved word for word as `.claude/skills/tdd/SKILL.md` and
+`.claude/skills/implement/SKILL.md`. Prompt 5 is the `/tdd` command.
+
+1. @prd/wishlist.md @plans/wishlist.md Implement Phase 1 only.
+
+   Follow the approved wishlist plan and the existing ThoughtTronix
+   conventions. Build the wishlist models, migrations, save/remove POST
+   views, HTMX button, authentication, authorization, Django admin
+   registration, and all required button states, including unavailable
+   products.
+
+   Use the project's existing testing process for Phase 1. Do not use /tdd
+   yet. Run the full pytest suite and Ruff linting and formatting checks.
+
+   Do not implement Phase 2 or Phase 3. Do not run the seed command against
+   my development database, and do not reset or delete db.sqlite3.
+
+   When Phase 1 is implemented, explain how I can manually verify every
+   acceptance criterion in the browser. Stop and wait for my approval
+   before continuing. Do not commit or push yet.
+2. Phase 1 of the ThoughtTronix wishlist is manually verified and
+   approved. Before starting Phase 2, create .claude/skills/tdd/SKILL.md
+   using the exact TDD skill instructions from Lesson 10 that I will paste
+   next. Do not invent a replacement skill or begin implementing Phase 2.
+   First confirm that you're ready for me to paste the full skill text.
+3. *(pasted the `tdd` skill's frontmatter only)*
+4. *(pasted the full `tdd` skill text)*
+5. /tdd @prd/wishlist.md @plans/wishlist.md implement phase 2
+6. I approve both TDD behaviors for Phase 2: (1) displaying only the
+   signed-in user's own saved products, and (2) showing a designed empty
+   state without creating a Wishlist record. Build only the necessary page
+   skeleton first, then follow the /tdd skill exactly. Write and run one
+   test at a time, demonstrate a genuine assertion failure (RED), show me
+   the test and explain what passing it will prove, and stop for my
+   approval before writing the implementation. Make sure newest-first
+   ordering and all remaining Phase 2 acceptance criteria are implemented
+   and tested normally. Do not begin Phase 3, run seed, or modify
+   db.sqlite3 unnecessarily.
+7. I approve the first RED test. It correctly verifies that the signed-in
+   customer sees their own saved product and not another customer's
+   product. The assertion failure is caused by the missing wishlist
+   listing behavior, not a setup error. Please proceed with the GREEN
+   step: implement only enough functionality to make this approved test
+   pass, run the test again, and run the relevant regression tests. Then
+   explain what changed and pause for my review before moving to the next
+   behavior.
+8. I approve GREEN for Behavior 1. The test passed, the relevant
+   regression tests passed, and filtering WishlistItem through
+   wishlist__user=self.request.user implements the actual ownership rule
+   rather than merely satisfying the test with hardcoded data. Please
+   proceed to Behavior 2 using the /tdd skill. Write one test for the
+   empty state and read-only behavior, run it to demonstrate a genuine
+   assertion failure (RED), show me the failing test and explain why it
+   failed, and stop for my approval before implementing the behavior.
+9. I approve the second RED test. The assertion failure correctly
+   demonstrates that the empty-state message is missing, while the test
+   also protects the requirement that viewing the page must not create a
+   Wishlist record. Please proceed with GREEN by implementing only enough
+   code to make this approved test pass. Rerun the test and relevant
+   regression tests, then explain what changed and stop for my approval
+   before implementing the remaining Phase 2 requirements.
+10. I approve GREEN for Behavior 2. The test now passes, the 101
+    regression tests pass, and the {% empty %} branch implements the
+    intended behavior rather than hardcoding the test case.
+
+    Both approved TDD behaviors are complete. Please finish the remaining
+    Phase 2 acceptance criteria using the project's normal implementation
+    and testing process, including newest-first ordering, product images,
+    names, prices, availability, detail-page links, an appropriately
+    designed empty state, the signed-in-only Wishlist navbar link, and
+    authentication and query-efficiency tests.
+
+    Run the full pytest suite and Ruff linting and formatting checks. Do
+    not implement Phase 3, run seed, or modify or reset db.sqlite3. When
+    Phase 2 is ready, provide step-by-step browser verification
+    instructions and stop for my approval. Do not commit or push yet.
+11. *(pasted the full `implement` skill text, with no instruction)*
+12. Yes to both questions.
+
+    1. Save the /implement skill exactly as I provided it to
+    .claude/skills/implement/SKILL.md. Do not execute it yet. Confirm the
+    file contains all five sections and the correct frontmatter.
+
+    2. I confirm that Wishlist Phase 2 passed manual browser verification
+    and is approved. Phase 1 was also manually verified and approved.
+
+    Before committing, please review git status and git diff, identify all
+    intended uncommitted work from Wishlist Phases 1 and 2, including the
+    PRD, plan, and /tdd and /implement skills. Update PROMPTS.md using its
+    existing conventions and review the proposed staged-file list with me.
+
+    Do not stage, reset, delete, or commit db.sqlite3 or
+    db.sqlite3.before-wishlist-backup. Do not include unrelated files. Stop
+    and wait for my approval of the exact commit contents before creating
+    or pushing any commits. Do not start Phase 3 yet.
+13. /implement @prd/wishlist.md @plans/wishlist.md implement phase 3
+14. Pastd text #10 +8 lines]
+15. I approve skipping TDD for Phase 3 because it only involves demo seed
+    data and documentation, which are not appropriate for test-first
+    development under our /tdd skill.
+
+    Before implementing Phase 3, let's finish committing Phases 1 and 2.
+    Both phases passed manual browser verification and are approved.
+
+    Please review git status, git diff, and the intended files from Phases
+    1 and 2, including prd/wishlist.md, plans/wishlist.md, the /tdd and
+    /implement skills, application code, tests, and PROMPTS.md.
+
+    Show me the exact files you intend to stage and the proposed commit
+    message. Do not commit or push until I approve that list.
+
+    Do not stage, modify, reset, delete, or commit db.sqlite3 or
+    db.sqlite3.before-wishlist-backup. Do not include unrelated files or
+    start Phase 3 implementation yet.
+
+### Summary
+- **Outcome:** signed-in shoppers can save and remove products from the
+  product page without a reload, and see everything they saved on a new
+  Wishlist page. Phase 3 (the demo wishlist in `seed`) is not started.
+  - **Phase 1 (built with the normal process, no `/tdd`):** a new
+    `wishlist` app. `Wishlist` is one per user and is created only by
+    `for_user()`. `WishlistItem` has `added_at`, newest-first ordering and
+    the `unique_wishlist_product` constraint. Three model methods:
+    `save_product()` (saving twice keeps one item), `Wishlist.remove_for()`
+    (harmless when nothing is saved) and the read-only
+    `Wishlist.has_saved()` (never creates a wishlist). The initial migration
+    is `wishlist/migrations/0001_initial.py`. `wishlist:save` and
+    `wishlist:remove` are POST-only, sign-in-required views sharing one base
+    view, and they act only through `request.user`. Save looks products up
+    through `available()`, so an unavailable or unknown product is a 404;
+    remove looks among all products. The button partial
+    `_wishlist_button.html` has all four states, with `aria-pressed`, the
+    hearts hidden from screen readers, and a stable `id="wishlist-button"`.
+    It sits beside add-to-cart, and `ProductDetailView` supplies `saved`.
+    `WishlistAdmin` has an item inline and search by username. New
+    `conftest.py` fixtures: `other_customer`, `wishlist`, `saved_item`.
+    Result: 538 tests passed; Ruff was clean after formatting two files.
+  - **Skills:** `.claude/skills/tdd/SKILL.md` (prompt 4) and
+    `.claude/skills/implement/SKILL.md` (prompt 12), saved exactly as
+    pasted. `implement` was not run.
+  - **Phase 2 with `/tdd`:** the skill proposed two behaviors, which the
+    developer approved. The skeleton (route, `LoginRequiredMixin` view, and
+    a page shell extending `base.html`) was built first.
+    - Behavior 1, privacy: the test failed on
+      `assert 'Seraphine Home Hub' in …`. GREEN was a `ListView` filtering
+      `WishlistItem` by `wishlist__user=request.user`.
+    - Behavior 2, empty state without creating a wishlist: the test failed
+      on `assert 'Your wishlist is empty' in …`. GREEN was an `{% empty %}`
+      branch.
+    - Each RED, GREEN and regression run stopped for the developer's
+      approval.
+  - **Phase 2, built normally:**
+    - The page is a DaisyUI card grid showing image, name, price,
+      availability, saved date and links to each product.
+    - The empty state is designed, in the same style as order history.
+    - `select_related("product__category")` loads each item's product and
+      category in the same query.
+    - The navbar has a plain "Wishlist" link for signed-in users only.
+    - `wishlist/test_list_page.py` covers the sign-in redirect, that viewing
+      changes nothing, newest first by `added_at` against creation order,
+      each card's contents, an empty but existing wishlist, a constant query
+      count, and the navbar link signed in and out.
+    - The query-count test was checked by removing `select_related` (14
+      queries against 6) and then restoring it.
+    - Result: 548 tests passed; `ruff check` and `ruff format --check` were
+      clean.
+  - **Manual verification:** the developer reported that Phase 1 (prompt 2)
+    and Phase 2 (prompt 12) both passed in the browser.
+  - **Phase 3 not started:** prompt 13 ran `/implement` for Phase 3. As
+    that skill requires, the agent ran `/tdd`, which found no candidates
+    because the phase is only seed data and documentation. The developer
+    approved skipping TDD (prompt 15) and asked to commit Phases 1 and 2
+    before any Phase 3 code. The Phase 3 work will get its own entry.
+  - **Data safety:** `seed` was never run. The agent never ran `migrate`; it
+    told the developer to run it before the Phase 1 browser check.
+    `db.sqlite3` and the developer's `db.sqlite3.before-wishlist-backup`
+    are left out of the commit.
+- **Deviations:**
+  - The plan listed three `/tdd` candidates. The skill proposed two,
+    leaving out newest-first ordering: Phase 1 had already set and tested
+    `-added_at` as the model's default order, so that test could never have
+    failed first. Ordering was tested normally instead, and the developer
+    approved the two-behavior selection.
+  - The `CLAUDE.md` project-layout update stays deferred, as the PRD says.
+- **Sideways:**
+  - The first `tdd` paste (prompt 3) held only the frontmatter. The agent
+    asked for the rest instead of saving a partial skill.
+  - Prompt 11 pasted the `implement` skill with no instruction. The agent
+    asked what to do with it, and didn't run it or commit anything.
+  - Prompt 14 arrived as a paste placeholder with no content. The agent
+    asked for it again and changed nothing; prompt 15 is the resent
+    message.
+  - A `sed` edit to add the button `id` failed on quoting, so the partial
+    was rewritten in full instead.
+  - The Phase 2 navbar link broke the Phase 1 test
+    `test_back_office_has_no_wishlist_screen`, which had looked for the
+    word "wishlist" anywhere on the back-office page. The agent saw this
+    before running the suite and narrowed the test to the back office's own
+    content below the navbar, which still has no wishlist tab or screen.
+  - `ruff format` reformatted `conftest.py` and `products/tests.py` in
+    Phase 1, and `wishlist/test_list_page.py` in Phase 2. All three were
+    reformatted before the final checks.
+
 ## 2026-10-16 — Account Security fix: reset links copied from the console work
 
 ### Prompts

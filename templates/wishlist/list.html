@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Your Wishlist — The ThoughtTronix Store{% endblock %}
+
+{% block content %}
+  <h1 class="text-3xl font-bold">Your Wishlist</h1>
+
+  {% if items %}
+    <p class="mt-1 text-sm opacity-60">
+      {{ items|length }} saved product{{ items|length|pluralize }}, newest first.
+      To remove one, open it and click “Saved — remove”.
+    </p>
+
+    <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {% for item in items %}
+        {% with product=item.product %}
+          <div class="card bg-base-100 shadow-md transition-shadow hover:shadow-xl">
+            <figure>
+              <a href="{{ product.get_absolute_url }}" class="block w-full shrink-0 basis-full">
+                {% include "products/partials/_image_frame.html" with image=product.card_image frame_class="w-full" %}
+              </a>
+            </figure>
+            <div class="card-body">
+              <h2 class="card-title">
+                <a href="{{ product.get_absolute_url }}" class="link-hover">{{ product.name }}</a>
+              </h2>
+              <div class="flex flex-wrap gap-2">
+                {% if product.is_available %}
+                  <span class="badge badge-success badge-outline">In stock</span>
+                {% else %}
+                  <span class="badge badge-warning badge-outline">Unavailable</span>
+                {% endif %}
+              </div>
+              <div class="card-actions items-center justify-between">
+                <p class="text-lg font-semibold text-primary">${{ product.price|intcomma }}</p>
+                <p class="text-right text-xs opacity-60">Saved {{ item.added_at|date:"M j, Y" }}</p>
+              </div>
+            </div>
+          </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="py-16 text-center">
+      <p class="text-5xl" aria-hidden="true">♡</p>
+      <p class="mt-4 text-xl font-semibold">Your wishlist is empty</p>
+      <p class="mt-2 opacity-70">
+        Tap “Save to wishlist” on any product to keep it here. We'll remember. We always do.
+      </p>
+      <a href="{% url 'products:catalog' %}" class="btn btn-primary btn-sm mt-6">
+        Browse the catalog
+      </a>
+    </div>
+  {% endif %}
+{% endblock %}

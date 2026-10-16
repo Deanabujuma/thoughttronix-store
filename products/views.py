@@ -12,6 +12,7 @@ from django.views.generic import (
 )
 
 from accounts.mixins import StaffRequiredMixin
+from wishlist.models import Wishlist
 
 from .forms import CategoryForm, ProductForm, TagForm
 from .models import Category, Product, Tag
@@ -64,11 +65,16 @@ class CategoryView(CatalogView):
 
 
 class ProductDetailView(DetailView):
-    """A single product at its slug URL."""
+    """A single product at its slug URL, with its wishlist button's state."""
 
     template_name = "products/detail.html"
     context_object_name = "product"
     queryset = Product.objects.select_related("category").prefetch_related("tags")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["saved"] = Wishlist.has_saved(self.request.user, self.object)
+        return context
 
 
 # --- The back office --------------------------------------------------------

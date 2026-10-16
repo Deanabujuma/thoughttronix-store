@@ -18,6 +18,7 @@ from PIL import Image
 from accounts.models import Address
 from orders.models import Cart, CartItem, Coupon
 from products.models import Category, Product, Tag
+from wishlist.models import Wishlist, WishlistItem
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +33,12 @@ def customer(db):
     return get_user_model().objects.create_user(
         username="customer", password="customer123"
     )
+
+
+@pytest.fixture
+def other_customer(db):
+    """A second shopper — for checking one user never touches another's data."""
+    return get_user_model().objects.create_user(username="other", password="other123")
 
 
 @pytest.fixture
@@ -100,6 +107,17 @@ def cart(customer):
 @pytest.fixture
 def cart_item(cart, product):
     return CartItem.objects.create(cart=cart, product=product, quantity=2)
+
+
+@pytest.fixture
+def wishlist(customer):
+    return Wishlist.for_user(customer)
+
+
+@pytest.fixture
+def saved_item(wishlist, product):
+    """The customer has saved the Seraphine Home Hub."""
+    return WishlistItem.objects.create(wishlist=wishlist, product=product)
 
 
 # Discount codes are dated relative to the store's own today, so the

@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils.html import escape
 
 from orders.models import CartItem, Order, OrderItem
+from wishlist.models import Wishlist
 
 from .models import Category, Product, Tag
 
@@ -93,6 +94,88 @@ def test_detail_shows_availability(client, unavailable_product):
     response = client.get(unavailable_product.get_absolute_url())
 
     assert "Unavailable" in response.content.decode()
+
+
+# --- The wishlist button on the detail page --------------------------------
+
+
+def wishlist_button(page):
+    """The wishlist control, from its opening tag through its closing tag."""
+    start = page.rfind("<", 0, page.index('id="wishlist-button"'))
+    end = min(
+        i for i in (page.find("</a>", start), page.find("</button>", start)) if i != -1
+    )
+    return page[start:end]
+
+
+def test_wishlist_button_signed_out_links_to_login(client, product):
+    page = client.get(product.get_absolute_url()).content.decode()
+
+    button = wishlist_button(page)
+    login = reverse("accounts:login")
+    assert button.startswith("<a ")
+    assert f'href="{login}?next=/products/seraphine-home-hub/"' in button
+    assert "btn btn-secondary btn-outline btn-sm" in button
+    assert "♡</span> Save to wishlist" in button
+    assert "hx-post" not in button
+
+
+def test_wishlist_button_available_not_saved(client, customer, product):
+    client.force_login(customer)
+
+    response = client.get(product.get_absolute_url())
+
+    button = wishlist_button(response.content.decode())
+    assert response.context["saved"] is False
+    assert f'hx-post="{reverse("wishlist:save", args=[product.pk])}"' in button
+    assert 'hx-swap="outerHTML"' in button
+    assert 'aria-pressed="false"' in button
+    assert 'class="btn btn-secondary btn-outline btn-sm"' in button
+    assert "♡</span> Save to wishlist" in button
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_wishlist_button_saved(client, customer, saved_item, product, available):
+    product.is_available = available
+    product.save()
+    client.force_login(customer)
+
+    response = client.get(product.get_absolute_url())
+
+    button = wishlist_button(response.content.decode())
+    assert response.context["saved"] is True
+    assert f'hx-post="{reverse("wishlist:remove", args=[product.pk])}"' in button
+    assert 'hx-swap="outerHTML"' in button
+    assert 'aria-pressed="true"' in button
+    assert 'class="btn btn-secondary btn-sm"' in button
+    assert "♥</span> Saved — remove" in button
+
+
+def test_wishlist_button_unavailable_not_saved(client, customer, unavailable_product):
+    client.force_login(customer)
+
+    page = client.get(unavailable_product.get_absolute_url()).content.decode()
+
+    button = wishlist_button(page)
+    assert "disabled" in button
+    assert "hx-post" not in button
+    assert "aria-pressed" not in button
+    assert "btn-outline" in button
+    assert "♡</span> Save to wishlist" in button
+    # Only add-to-cart's button says "Unavailable" (the badge is the other).
+    assert page.count(">Unavailable</button>") == 1
+
+
+@pytest.mark.parametrize("signed_in", [True, False])
+def test_viewing_a_product_never_creates_a_wishlist(
+    client, customer, product, signed_in
+):
+    if signed_in:
+        client.force_login(customer)
+
+    client.get(product.get_absolute_url())
+
+    assert not Wishlist.objects.exists()
 
 
 FEATURED_BADGE = '<span class="badge badge-accent">Featured</span>'

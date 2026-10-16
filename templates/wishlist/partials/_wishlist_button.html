@@ -1,0 +1,33 @@
+{# The save-to-wishlist control, in all its states. Include with saved=<bool>; #}
+{# the signed-in buttons are HTMX swaps that re-render only this partial. #}
+{# A saved product can always be removed, even once it's unavailable. #}
+{% if not user.is_authenticated %}
+  {# Anonymous visitors are prompted to sign in — a plain link, no HTMX. #}
+  <a id="wishlist-button"
+     href="{% url 'accounts:login' %}?next={{ product.get_absolute_url|urlencode }}"
+     class="btn btn-secondary btn-outline btn-sm">
+    <span aria-hidden="true">♡</span> Save to wishlist
+  </a>
+{% elif saved %}
+  <button id="wishlist-button" type="button"
+    hx-post="{% url 'wishlist:remove' product.pk %}"
+    hx-swap="outerHTML"
+    aria-pressed="true"
+    class="btn btn-secondary btn-sm">
+    <span aria-hidden="true">♥</span> Saved — remove
+  </button>
+{% elif product.is_available %}
+  <button id="wishlist-button" type="button"
+    hx-post="{% url 'wishlist:save' product.pk %}"
+    hx-swap="outerHTML"
+    aria-pressed="false"
+    class="btn btn-secondary btn-outline btn-sm">
+    <span aria-hidden="true">♡</span> Save to wishlist
+  </button>
+{% else %}
+  {# Not for sale and not saved: add-to-cart's "Unavailable" says why. #}
+  <button id="wishlist-button" type="button"
+    class="btn btn-secondary btn-outline btn-sm" disabled>
+    <span aria-hidden="true">♡</span> Save to wishlist
+  </button>
+{% endif %}
