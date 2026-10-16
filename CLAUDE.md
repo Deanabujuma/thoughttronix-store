@@ -1,6 +1,6 @@
 # CLAUDE.md — The ThoughtTronix Store
 
-A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platform.md`) and the plan (`plans/core-platform.md`) record how the core platform was designed and built; `prd/discount-codes.md` and `plans/discount-codes.md` do the same for discount codes; `prd/product-images.md` and `plans/product-images.md` for product images; `prd/account-security.md` and `plans/account-security.md` for the account security center.
+A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platform.md`) and the plan (`plans/core-platform.md`) record how the core platform was designed and built; `prd/discount-codes.md` and `plans/discount-codes.md` do the same for discount codes; `prd/product-images.md` and `plans/product-images.md` for product images; `prd/account-security.md` and `plans/account-security.md` for the account security center; `prd/wishlist.md` and `plans/wishlist.md` for the wishlist.
 
 ## Commands
 
@@ -30,6 +30,10 @@ A server-rendered Django 6 storefront and back office. The PRD (`prd/core-platfo
 - `orders/` — cart, checkout, orders, discount codes (`Coupon`), and
   back-office order and discount-code management
 - `dashboard/` — the staff analytics dashboard
+- `wishlist/` — each shopper's private wishlist (`Wishlist`, `WishlistItem`):
+  the HTMX save/remove button on the product detail page and the
+  `/wishlist/` page. Customers, staff, and admin each get their own. There
+  is no back-office screen; wishlists are managed only in the Django admin
 - `PROMPTS.md` — the AI-usage log; append entries, never rewrite history
 - `templates/` — project-level templates (`base.html`); app templates live in
   `templates/<app>/`
