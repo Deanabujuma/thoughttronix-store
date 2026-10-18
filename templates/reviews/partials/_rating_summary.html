@@ -1,0 +1,16 @@
+{# A product's rating summary. Include with average=<number or None> count=<int>. #}
+{# The stars are decoration; the label says it in words. Zero reviews says #}
+{# so in words, never as "0.0 stars". #}
+{% load review_extras %}
+{% if count %}
+  <p class="flex items-center gap-2"
+     role="img"
+     aria-label="Rated {{ average|floatformat:1 }} out of 5, {{ count }} review{{ count|pluralize }}">
+    <span class="text-warning" aria-hidden="true">{{ average|star_glyphs }}</span>
+    <span>{{ average|floatformat:1 }}</span>
+    <span aria-hidden="true">·</span>
+    <span>{{ count }} review{{ count|pluralize }}</span>
+  </p>
+{% else %}
+  <p class="opacity-70">No reviews yet</p>
+{% endif %}

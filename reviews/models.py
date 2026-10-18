@@ -1,0 +1,151 @@
+from django.conf import settings
+from django.core.validators import (
+    MaxLengthValidator,
+    MaxValueValidator,
+    MinValueValidator,
+)
+from django.db import models
+from django.db.models import Avg, Count, Q
+from django.utils import timezone
+
+from orders.models import Order, OrderItem
+from products.models import Product
+
+
+class ReviewQuerySet(models.QuerySet):
+    def published(self):
+        """Only what the public may see.
+
+        Every public list, average and count goes through here, so a
+        hidden review drops out everywhere at once.
+        """
+        return self.filter(status=Review.Status.PUBLISHED)
+
+    def summary_for(self, product):
+        """The product's rating summary: ``{"average": …, "count": …}``.
+
+        Published reviews only, in one query. ``average`` is ``None``
+        when there are none.
+        """
+        return (
+            self.published()
+            .filter(product=product)
+            .aggregate(average=Avg("rating"), count=Count("pk"))
+        )
+
+    def own(self, user, product):
+        """The visitor's own review of ``product``, or ``None``."""
+        if not user.is_authenticated:
+            return None
+        return self.filter(user=user, product=product).first()
+
+    def can_create(self, user, product):
+        """Whether ``user`` may write a new review of ``product``.
+
+        Only a regular customer with a Delivered order containing this
+        exact product record (matched by FK, never by name) qualifies,
+        and only while they have no review of it yet.
+        """
+        if not user.is_authenticated or user.is_staff or user.is_superuser:
+            return False
+        if self.filter(user=user, product=product).exists():
+            return False
+        return OrderItem.objects.filter(
+            product=product,
+            order__user=user,
+            order__status=Order.Status.DELIVERED,
+        ).exists()
+
+    def visitor_state(self, user, product, own_review):
+        """Which "Your review" area the product page shows this visitor.
+
+        One of ``"anonymous"``, ``"author"``, ``"staff"`` (shown nothing),
+        ``"eligible"`` or ``"ineligible"``. It asks ``can_create`` — the
+        same rule the create view enforces — so the page never offers
+        what the server would refuse.
+        """
+        if not user.is_authenticated:
+            return "anonymous"
+        if own_review:
+            return "author"
+        if user.is_staff or user.is_superuser:
+            return "staff"
+        if self.can_create(user, product):
+            return "eligible"
+        return "ineligible"
+
+
+class Review(models.Model):
+    """One customer's rating of one product they received.
+
+    Reviews go live at once and are moderated after the fact. ``status``
+    is stored on its own and never inferred from ``hidden_by``, which
+    becomes NULL if the moderator's account is deleted.
+    """
+
+    class Status(models.TextChoices):
+        PUBLISHED = "PUBLISHED", "Published"
+        HIDDEN = "HIDDEN", "Hidden"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="reviews"
+    )
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    # TextField's max_length only reaches the form; the validator makes
+    # the model enforce it too.
+    comment = models.TextField(
+        max_length=2000, blank=True, validators=[MaxLengthValidator(2000)]
+    )
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PUBLISHED
+    )
+    hidden_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    hidden_at = models.DateTimeField(null=True, blank=True)
+    hidden_reason = models.CharField(max_length=200, blank=True)
+    # default (not auto_now_add) so the seed can backdate reviews.
+    created_at = models.DateTimeField(default=timezone.now)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
+    objects = ReviewQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "product"], name="unique_review_user_product"
+            ),
+            models.CheckConstraint(
+                condition=Q(rating__gte=1, rating__lte=5),
+                name="review_rating_1_to_5",
+            ),
+            # Hidden always carries its record; published never does.
+            # hidden_by is left out on purpose: it can become NULL.
+            models.CheckConstraint(
+                condition=(
+                    Q(status="HIDDEN", hidden_at__isnull=False) & ~Q(hidden_reason="")
+                )
+                | Q(status="PUBLISHED", hidden_at__isnull=True, hidden_reason=""),
+                name="review_hidden_state_consistent",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.rating}★ for {self.product.name}"
+
+    def save(self, *args, **kwargs):
+        # Trim on every save, so a whitespace-only comment is stored empty.
+        self.comment = self.comment.strip()
+        super().save(*args, **kwargs)

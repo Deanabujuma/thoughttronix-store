@@ -16,7 +16,7 @@ from django.utils import timezone
 from PIL import Image
 
 from accounts.models import Address
-from orders.models import Cart, CartItem, Coupon
+from orders.models import Cart, CartItem, Coupon, Order, OrderItem
 from products.models import Category, Product, Tag
 from wishlist.models import Wishlist, WishlistItem
 
@@ -118,6 +118,51 @@ def wishlist(customer):
 def saved_item(wishlist, product):
     """The customer has saved the Seraphine Home Hub."""
     return WishlistItem.objects.create(wishlist=wishlist, product=product)
+
+
+# Orders for reviews: eligibility turns on a Delivered order containing the
+# exact product, so tests build orders of any status for any shopper.
+
+
+def _order(user, status, *products):
+    order = Order.objects.create(
+        user=user,
+        status=status,
+        total=sum((p.price for p in products), Decimal("0.00")),
+        email=f"{user.username}@example.com",
+        shipping_name="Casey Monroe",
+        shipping_street="214 Synapse Street",
+        shipping_city="Canyon",
+        shipping_state="TX",
+        shipping_zip="79015",
+        billing_name="Casey Monroe",
+        billing_street="214 Synapse Street",
+        billing_city="Canyon",
+        billing_state="TX",
+        billing_zip="79015",
+        card_last4="4242",
+    )
+    for product in products:
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            product_name=product.name,
+            unit_price=product.price,
+            quantity=1,
+        )
+    return order
+
+
+@pytest.fixture
+def order_for(db):
+    """Build an order: ``order_for(user, Order.Status.SHIPPED, product)``."""
+    return _order
+
+
+@pytest.fixture
+def delivered_order(customer, product):
+    """The customer has received the Seraphine Home Hub."""
+    return _order(customer, Order.Status.DELIVERED, product)
 
 
 # Discount codes are dated relative to the store's own today, so the

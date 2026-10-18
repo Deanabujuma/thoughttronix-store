@@ -12,6 +12,7 @@ from django.views.generic import (
 )
 
 from accounts.mixins import StaffRequiredMixin
+from reviews.models import Review
 from wishlist.models import Wishlist
 
 from .forms import CategoryForm, ProductForm, TagForm
@@ -65,7 +66,12 @@ class CategoryView(CatalogView):
 
 
 class ProductDetailView(DetailView):
-    """A single product at its slug URL, with its wishlist button's state."""
+    """A single product at its slug URL, with its wishlist button's state,
+    its rating summary, and its reviews.
+
+    The visitor's own review is pinned on its own, so it's left out of
+    the public list below it.
+    """
 
     template_name = "products/detail.html"
     context_object_name = "product"
@@ -73,7 +79,18 @@ class ProductDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["saved"] = Wishlist.has_saved(self.request.user, self.object)
+        user, product = self.request.user, self.object
+        own_review = Review.objects.own(user, product)
+        reviews = Review.objects.published().filter(product=product)
+        if own_review:
+            reviews = reviews.exclude(pk=own_review.pk)
+        context.update(
+            saved=Wishlist.has_saved(user, product),
+            rating=Review.objects.summary_for(product),
+            own_review=own_review,
+            review_state=Review.objects.visitor_state(user, product, own_review),
+            reviews=reviews,
+        )
         return context
 
 

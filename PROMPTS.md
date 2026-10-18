@@ -28,6 +28,378 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-18 — Product reviews: PRD finalized, six-phase plan, Phase 1 (write and display reviews)
+
+### Prompts
+One agent session, which resumed the product-reviews homework after a break.
+Prompt text is verbatim, typos included. Most prompts were pasted in, so
+they reached the agent as plain text. The exceptions are prompt 6, typed as
+a slash command, and prompt 7, typed directly. Prompt 11 is described
+rather than reproduced: it was a copy of the agent's own previous update.
+
+1. We're resuming Lesson 10 Product Reviews after a break. First check
+   whether prd/product-reviews.md or plans/product-reviews.md already exist
+   and what work was completed. Read CLAUDE.md and any existing Product
+   Reviews files. Do not restart the 19-question interview.
+
+   Our next task is to finalize the Product Reviews PRD. We approved using
+   /backoffice/ URLs, a separate reviews Django app, the four proposed
+   defaults, and leaving TDD phase selection for the implementation plan. We
+   also requested confirmation that seeded Delivered orders support more
+   than 10 eligible published reviews for one product, and POST-only
+   restriction clearing after a GET confirmation page.
+
+   Report the current status and what remains to be done before editing
+   anything. Do not implement code, run seed, modify or reset db.sqlite3, or
+   touch db.sqlite3.before-wishlist-backup.
+2. Thank you for identifying the conflict. Here are my final decisions.
+
+   The four previously approved defaults are:
+   1. Set edited_at only when the rating or comment actually changes.
+   2. Make moderation fields read-only in Django admin.
+   3. Return HTTP 404 for edit/delete pages when the signed-in user has no
+   review to act on.
+   4. If a ReviewRestriction already exists, update it rather than creating
+   a duplicate.
+
+   For the pagination conflict, keep 10 reviews per page and preserve all
+   existing seeded users, orders, and dashboard metrics. Remove the
+   requirement that the demo seed itself produce more than 10 reviews for
+   one product. Keep the seed realistic: reviews only from customers with
+   qualifying Delivered orders. State the actual maximum of five eligible
+   reviewers per product found in your simulation.
+
+   Test pagination using isolated pytest fixtures that create at least 11
+   eligible reviewers with Delivered orders for the same product. Do not
+   modify the development database for this.
+
+   Please revise prd/product-reviews.md to resolve the constraint and
+   confirm the four defaults. Preserve all other approved requirements. Show
+   me a concise diff/summary of the changes and then draft the phased
+   implementation plan for review before saving it.
+
+   Do not write application code, make migrations, run seed against
+   db.sqlite3, or touch my database backup.
+3. I approve the revised Product Reviews PRD and the proposed SIX-PHASE
+   implementation plan.
+
+   Keep Phases 4 and 5 separate. For Phase 6, I approve isolated automated
+   verification instead of running the destructive seed command against my
+   personal development database.
+
+   Before the first local migration, stop and help me create
+   db.sqlite3.before-reviews-backup. Never modify, delete, or overwrite
+   db.sqlite3.before-wishlist-backup.
+
+   Ensure Phase 1 establishes the Review model and published-only query
+   behavior needed for later moderation, without unnecessary changes to
+   existing tables.
+
+   Save the plan to plans/product-reviews.md, then confirm both the PRD and
+   plan are saved. Show git status and the six phase headings.
+
+   Do not implement Phase 1 yet, make migrations, run seed, or touch my
+   development database. Stop after saving the plan and wait for my next
+   instruction.
+4. /implement @prd/product-reviews.md @plans/product-reviews.md implement
+   phase 1
+
+   Implement only Phase 1 and follow every /tdd approval checkpoint. Before
+   any migration is applied to my development database, stop and help me
+   create db.sqlite3.before-reviews-backup without overwriting any existing
+   backup.
+
+   You may create migration files and run automated tests in their isolated
+   test database. Do not run seed against db.sqlite3. Do not touch
+   db.sqlite3.before-wishlist-backup.
+
+   After automated checks, give me browser verification instructions and
+   stop for approval before committing or moving to Phase 2.
+5. I approve all three proposed Phase 1 TDD behaviors:
+   1. Delivered-order eligibility for the exact product, excluding other
+   statuses and staff/admin.
+   2. Duplicate submissions create only one review and never cause a 500
+   error.
+   3. Product averages and counts include only published reviews.
+
+   However, before implementation, please investigate why /implement is not
+   available. We previously created and committed
+   .claude/skills/implement/SKILL.md during the Wishlist assignment.
+
+   Check whether that file exists, whether its YAML frontmatter is valid,
+   and whether Claude Code needs a session restart or reload to discover it.
+   Do not overwrite the existing skill or recreate it unnecessarily.
+
+   Stop and tell me what you find and the exact next step. Do not write
+   application code, run migrations, or begin RED/GREEN cycles yet.
+6. /implement @prd/product-reviews.md @plans/product-reviews.md implement
+   phase 1
+7. pprove the first RED test exactly as written, including all elgilbility
+   scenarios. Proceed with GREEN for behavior 1 only. wtite the minimum code
+8. I approve GREEN for Behavior 1. All seven eligibility cases pass, the
+   full 559-test regression suite passes, and Ruff is clean.
+
+   Continue Phase 1 by adding the remaining can_create safeguards for
+   anonymous users and customers who already have a review, with normal
+   tests. Build the minimum create-view and form skeleton needed for
+   Behavior 2.
+
+   Then write and run the RED test for Behavior 2: repeated or concurrent
+   review submissions must not create duplicate reviews or produce an HTTP
+   500 error.
+
+   Stop after reporting the RED test and its expected assertion failure. Do
+   not implement GREEN for Behavior 2 until I approve it.
+
+   Do not migrate or seed my development database, touch either backup,
+   commit, push, or begin another phase.
+9. I approve the Behavior 2 RED test, including both repeated and simulated
+   concurrent submissions.
+
+   I approve redirecting customers who already have a review with the
+   message "You've already reviewed this product" instead of returning 403
+   for duplicate create attempts. Other unauthorized authenticated users
+   must still receive 403.
+
+   I also approve the deterministic pre_save-hook simulation of the race
+   condition.
+
+   Proceed with GREEN for Behavior 2 only. Handle the unique constraint race
+   inside an appropriate transaction/savepoint, catch only the relevant
+   duplicate-review IntegrityError, and do not hide unrelated database
+   errors. Ensure that the existing review's rating and comment are never
+   overwritten.
+
+   Run both Behavior 2 cases, relevant regressions, and Ruff checks. Report
+   the results and STOP for my GREEN approval before starting Behavior 3.
+
+   Do not migrate or seed db.sqlite3, touch either backup, commit, or push.
+10. I choose Option 1. I approve changing the concurrent-submission test to
+    insert the competing review after form validation but before the
+    transaction.atomic() savepoint, so the winning review survives the
+    losing insert's rollback.
+
+    Keep all four original test assertions unchanged. Keep the production
+    savepoint and the safeguard that unrelated IntegrityErrors must be
+    re-raised.
+
+    Also inspect reviews/views.py carefully: the displayed diff appears to
+    contain response = super().form_valid(form) both before the try block
+    and inside transaction.atomic(). Make sure the final code calls
+    super().form_valid(form) only once, inside the savepoint. Do not
+    accidentally save the form twice.
+
+    Rerun both duplicate-submission cases, relevant regression tests, and
+    Ruff. If GREEN is reached, report the exact results and STOP for my
+    approval before starting Behavior 3.
+
+    Do not migrate or seed my development database, touch either backup,
+    commit, or push.
+11. *(A copy of the agent's previous update, pasted back with no new
+    instructions: its note that `super().form_valid(form)` appears only
+    once, the displayed diff of the `other_tab_wins` fixture change, and
+    "The full suite is running.")*
+12. I approve GREEN for Behavior 2. Both duplicate-submission cases pass,
+    the full 564-test suite passes, and Ruff is clean.
+
+    Proceed to Behavior 3: published-only average ratings and review counts
+    on the product detail page.
+
+    Build only the minimal supporting skeleton normally, then write and run
+    the Behavior 3 RED test. Include a published review and a hidden review
+    to prove that only published reviews contribute to the average and
+    count, with the displayed average rounded to one decimal place.
+
+    Stop after demonstrating the expected RED assertion failure. Do not
+    implement GREEN until I approve it.
+
+    During the remaining normal Phase 1 work, also add a regression test
+    proving unrelated IntegrityErrors are re-raised rather than silently
+    handled as duplicate reviews.
+
+    Do not migrate or seed db.sqlite3, touch either backup, commit, push, or
+    start Phase 2.
+13. I approve the Behavior 3 RED test exactly as written.
+
+    Proceed with GREEN for Behavior 3 only. Implement
+    Review.objects.summary_for(product) using only published reviews,
+    computing their average and count efficiently. Keep the approved
+    one-decimal display and zero-review empty state.
+
+    Run the Behavior 3 test, relevant regression tests, the full suite, Ruff
+    lint, and Ruff formatting checks. Report exact results and stop for my
+    GREEN approval before starting the remaining Phase 1 work.
+
+    Remember to add the unrelated IntegrityError regression test during the
+    remaining normal Phase 1 work.
+
+    Do not apply migrations or run seed against db.sqlite3, touch either
+    database backup, commit, push, or begin Phase 2.
+14. I approve GREEN for Behavior 3. The full 565-test suite passes, and Ruff
+    lint and formatting checks are clean.
+
+    All three planned TDD cycles for Phase 1 are complete. Proceed with the
+    remaining normal Phase 1 implementation according to
+    prd/product-reviews.md and plans/product-reviews.md.
+
+    Complete the accessible DaisyUI star form, product detail review
+    section, published review display, Verified buyer bylines,
+    visitor-specific eligibility states, pinned Your review display,
+    zero-review empty state, and ReviewAdmin. Add model, view,
+    authorization, escaping, validation, and regression tests, including
+    proving unrelated IntegrityErrors are re-raised.
+
+    Implement only Phase 1. Do not begin editing/deleting review
+    functionality planned for Phase 2 or moderation planned for Phase 4.
+
+    Run the full test suite, Ruff lint, Ruff formatting, and migration
+    checks. Fix any failures.
+
+    Then STOP before applying any migrations to db.sqlite3. Give me the safe
+    PowerShell instructions to create db.sqlite3.before-reviews-backup
+    without overwriting an existing backup. Wait for my confirmation before
+    migrating or proceeding to browser verification.
+
+    Do not run seed, touch the wishlist backup, commit, or push.
+15. Please perform a READ-ONLY inspection of my existing development
+    database. Find regular (non-staff, non-superuser) customer accounts with
+    Delivered orders and identify the exact products in those orders.
+    Report only the usernames, order statuses, and product names/slugs. Do
+    not display passwords, hashes, emails, or other sensitive details.
+
+    Do not create, modify, delete, seed, or reset any records. Do not run
+    migrations, commit, or push. Stop after reporting the eligible accounts
+    and products so I can choose how to test Phase 1 in my browser.
+16. Phase 1 browser verification: I signed in as the existing customer
+    account, submitted a 4-star MindSync review, and confirmed the product
+    page displays a 4.0 average, 1 review, the pinned Your review section,
+    Verified buyer, and the correct comment. Functionality works.
+
+    However, on the review form, the five rating controls render as small
+    gray circles instead of visible stars. Please investigate the actual
+    template, DaisyUI classes, and currently compiled CSS. Fix only this
+    presentation issue, ideally with existing CSS or an accessible
+    no-JavaScript fallback. Preserve radio-group keyboard accessibility,
+    rating values, and form validation.
+
+    Do not disable Windows security controls or rely on running the blocked
+    Tailwind executable. Do not seed, reset, or modify existing database
+    records. Run focused tests, the full suite, and Ruff checks after any
+    code changes. Stop and report what changed before any commit or push.
+    Stay in Phase 1.
+17. Phase 1 browser verification is complete: staff, anonymous, ineligible
+    and eligible customer states were checked; a 4-star MindSync review
+    submitted successfully; the public rating, count, Verified buyer byline
+    and pinned Your review all displayed correctly. The SyncRest form now
+    visually displays all five star choices. I will also confirm native
+    radio selection in the browser.
+
+    Please complete the Phase 1 PROMPTS.md documentation required by the
+    /implement workflow. Then run git status and show me the exact proposed
+    files to stage, their changes, and any untracked files. Verify the final
+    full test suite, Ruff, and migration checks remain clean.
+
+    Do not stage, commit, push, seed, reset, or alter database records.
+    Explicitly exclude db.sqlite3, db.sqlite3.before-wishlist-backup, and
+    db.sqlite3.before-reviews-backup. Stop for my approval of the staging
+    list.
+
+### Summary
+- **Outcome:** the PRD is final, the six-phase plan is saved, and Phase 1 is
+  built. A customer who received a product can review it, and everyone can
+  see published reviews on the product page.
+  - **PRD (prompts 1–2):** the "more than 10 seeded reviews on one product"
+    goal could not be met. The agent replayed the seed's fixed-seed order
+    RNG in plain Python, without touching a database. At most **five**
+    distinct customers have a Delivered order for any one product, and the
+    seed has only 10 regular customers in total. The developer removed the
+    requirement and kept 10 reviews per page. Pagination will be proven by
+    pytest fixtures with 11 or more reviewers. The "Unresolved Constraints"
+    section became "Resolved Constraints", and the four confirmed defaults
+    are recorded there.
+  - **Plan (prompt 3):** `plans/product-reviews.md` has six phases, with
+    Phases 4 and 5 kept separate. Phase 6 (seed) is verified by tests only.
+    Phase 1 creates the complete `Review` model and `published()` so later
+    phases need no further `Review` migration.
+  - **TDD (prompts 5–13):** three approved behaviors, each RED on an
+    assertion, then GREEN with the full suite run:
+    1. `can_create`: only a regular customer with a Delivered order of
+       this exact product record qualifies. One parametrized test covers
+       seven cases.
+    2. Duplicate submissions: one row, a redirect with "You've already
+       reviewed this product.", never a 500. The save runs in a savepoint,
+       and an `IntegrityError` is handled only when the customer's review
+       now exists; anything else is re-raised.
+    3. `summary_for`: the average and count use published reviews only, in
+       one aggregate query, and the average is shown to one decimal.
+  - **Normal Phase 1 work (prompt 14):**
+    - The `reviews` app: model, migration `0001_initial` (creates only
+      `reviews_review`), `ReviewForm`, `ReviewCreateView` at
+      `/products/<slug>/review/`, and `ReviewAdmin` with the moderation
+      fields read-only.
+    - `visitor_state()` and the `star_glyphs` filter, which rounds to the
+      nearest half.
+    - The product page's `#reviews` section: "Verified buyer" bylines, the
+      pinned "Your review", every Phase 1 visitor state, and the empty
+      state.
+    - 69 new tests, including the regression test that an unrelated
+      `IntegrityError` is re-raised. Final checks: 634 tests passed; Ruff
+      lint and format and `makemigrations --check` were clean.
+  - **Browser verification (prompts 16–17):** done by the developer as
+    `customer`, staff, anonymous and ineligible visitors. Native radio
+    selection was still to be confirmed.
+- **Deviations:**
+  - A customer who already has a review is redirected with a message
+    rather than given 403 (approved in prompt 9). Everyone else who isn't
+    allowed still gets 403.
+  - The race simulation moved from a `pre_save` hook to wrapping
+    `ReviewForm.clean` (Option 1, prompt 10).
+  - The PRD and plan say the stars are "styled with DaisyUI `rating`". The
+    form now uses native DaisyUI `radio` inputs with star glyphs and
+    visible "N stars" labels instead (prompt 16). The PRD and plan text
+    were not updated.
+  - `/implement`'s final step says to commit **and push**. The developer's
+    standing instruction is to stop for approval first, so nothing has been
+    committed.
+  - The `CLAUDE.md` update for the `reviews` app is still deferred, as the
+    PRD says.
+- **Sideways:**
+  - **`/implement` didn't run at first (prompt 4).** The skill sets
+    `disable-model-invocation: true`, so only a typed slash command starts
+    it, and a slash command inside pasted text arrives as plain text. The
+    file and its frontmatter were fine and no restart was needed (prompt
+    5). Typing the command (prompt 6) worked.
+  - **The approved race simulation couldn't pass.** The `pre_save` hook ran
+    inside the view's savepoint, so the "other tab's" row was rolled back
+    with the losing insert. The re-check then found no review and correctly
+    re-raised. The agent stopped, did not loosen the error handling, and
+    offered two options. Moving the hook to `ReviewForm.clean` fixed it
+    with the four assertions unchanged.
+  - **A diff display looked like a double save.** The developer read the
+    edit's before/after display as two calls to `super().form_valid(form)`
+    (prompt 10). Reading the file showed one call, inside the savepoint.
+  - **The model didn't enforce the comment limit.** A new test showed that
+    `TextField(max_length=2000)` only limits the form. The agent added a
+    `MaxLengthValidator` and regenerated the unapplied, uncommitted
+    `0001_initial.py` instead of adding a second migration.
+  - **Migrations were never run against the real database.** `makemigrations`
+    and its `--check` ran against an in-memory database, so `db.sqlite3`
+    wasn't opened during implementation.
+  - **The migration was applied outside the agent.** During the read-only
+    inspection (prompt 15), `db.sqlite3` had a new modification time. Read-
+    only queries showed `reviews.0001_initial` applied at 17:11 UTC and a
+    sign-in at 17:41 UTC, neither run by the agent. They also showed
+    `db.sqlite3.before-reviews-backup` with the pre-migration size and
+    timestamp. The agent reported this rather than assuming who did it.
+  - **The stars rendered as gray circles (prompt 16).** The compiled
+    `tailwind.css` dated from Oct 11 and had none of the new DaisyUI
+    `rating`/`mask` classes, and the Tailwind build is blocked on this
+    machine. Several layout utilities the new templates used were missing
+    too. Every class in the reviews templates was checked against the
+    compiled CSS, and the missing ones were replaced with ones already
+    there. The agent did not add an automated CSS check, because
+    `tailwind.css` is not committed.
+
 ## 2026-10-16 — Wishlist Phase 3: demo wishlist in seed
 
 ### Prompts

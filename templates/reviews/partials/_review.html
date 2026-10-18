@@ -1,0 +1,16 @@
+{# One review, signed only "Verified buyer" — never a username or name. #}
+{# Include with review=<Review>. The comment is auto-escaped; never |safe. #}
+{% load review_extras %}
+<article class="rounded-box bg-base-200 p-6">
+  <p class="flex flex-wrap items-center gap-2">
+    <span class="text-warning" aria-hidden="true">{{ review.rating|star_glyphs }}</span>
+    <span class="sr-only">Rated {{ review.rating }} out of 5</span>
+    <span class="badge badge-success badge-outline badge-sm">Verified buyer</span>
+  </p>
+  {% if review.comment %}
+    <p class="mt-2">{{ review.comment|linebreaksbr }}</p>
+  {% endif %}
+  <p class="mt-2 text-sm opacity-60">
+    Posted <time datetime="{{ review.created_at|date:'c' }}">{{ review.created_at|date:"M j, Y" }}</time>
+  </p>
+</article>

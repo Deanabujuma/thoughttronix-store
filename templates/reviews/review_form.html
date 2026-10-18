@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load review_extras %}
+
+{% block title %}Review {{ product.name }} — The ThoughtTronix Store{% endblock %}
+
+{% block content %}
+  <div class="breadcrumbs mb-6 text-sm">
+    <ul>
+      <li><a href="{% url 'products:catalog' %}">Catalog</a></li>
+      <li><a href="{{ product.get_absolute_url }}">{{ product.name }}</a></li>
+      <li>Write a review</li>
+    </ul>
+  </div>
+
+  <h1 class="text-3xl font-bold">Review {{ product.name }}</h1>
+
+  <form method="post" class="mt-6 max-w-2xl space-y-6">
+    {% csrf_token %}
+    {% for error in form.non_field_errors %}
+      <div class="alert alert-error" role="alert">{{ error }}</div>
+    {% endfor %}
+
+    {# Five native radios, each with a real label: the stars show the choice, #}
+    {# the words name it. No JavaScript — the arrow keys move between them #}
+    {# like any radio group. Only classes already in the compiled CSS. #}
+    <fieldset>
+      <legend class="label mb-1">Your rating</legend>
+      <div class="flex flex-wrap gap-4">
+        {% for radio in form.rating %}
+          <label for="{{ radio.id_for_label }}" class="label cursor-pointer gap-2">
+            <input type="radio"
+                   id="{{ radio.id_for_label }}"
+                   name="{{ radio.data.name }}"
+                   value="{{ radio.data.value }}"
+                   class="radio"
+                   {% if radio.data.selected %}checked{% endif %}
+                   required />
+            <span class="text-lg text-warning" aria-hidden="true">{{ radio.data.value|star_glyphs }}</span>
+            <span>{{ radio.choice_label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% for error in form.rating.errors %}
+        <p class="mt-1 text-sm text-error">{{ error }}</p>
+      {% endfor %}
+    </fieldset>
+
+    {% include "products/partials/_field.html" with field=form.comment %}
+
+    <div class="flex gap-2">
+      <button type="submit" class="btn btn-primary">Post review</button>
+      <a href="{{ product.get_absolute_url }}#reviews" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+{% endblock %}
