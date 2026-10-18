@@ -1,0 +1,74 @@
+{% extends "backoffice/base.html" %}
+{% load review_extras %}
+
+{% block title %}Review of {{ review.product.name }} — Back office{% endblock %}
+
+{% block backoffice %}
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <h2 class="text-2xl font-bold">
+      Review of <a href="{{ review.product.get_absolute_url }}" class="link-hover">{{ review.product.name }}</a>
+    </h2>
+    <div class="flex flex-wrap items-center gap-2">
+      {% include "reviews/partials/_moderation_status.html" %}
+    </div>
+  </div>
+  <p class="mt-1 opacity-70">
+    By <span class="font-semibold">{{ review.user.username }}</span>
+    · Posted {{ review.created_at|date:"F j, Y" }}
+    {% if review.edited_at %}· Edited {{ review.edited_at|date:"F j, Y" }}{% endif %}
+  </p>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-3">
+    <div class="card bg-base-100 shadow-md lg:col-span-2">
+      <div class="card-body">
+        <p>
+          <span class="text-lg text-warning" aria-hidden="true">{{ review.rating|star_glyphs }}</span>
+          <span class="sr-only">Rated {{ review.rating }} out of 5</span>
+        </p>
+        {# The full comment, auto-escaped; never |safe. #}
+        {% if review.comment %}
+          <p>{{ review.comment|linebreaksbr }}</p>
+        {% else %}
+          <p class="italic opacity-60">No comment — a rating only.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body">
+        <h3 class="card-title text-base">Moderation</h3>
+        {# Both actions are POST-only and CSRF-protected. There is no delete. #}
+        {% if review.status == "HIDDEN" %}
+          <dl class="space-y-2 text-sm">
+            <div>
+              <dt class="opacity-60">Hidden by</dt>
+              <dd>{% if review.hidden_by %}{{ review.hidden_by.username }}{% else %}Former staff member{% endif %}</dd>
+            </div>
+            <div>
+              <dt class="opacity-60">Hidden on</dt>
+              <dd>{{ review.hidden_at|date:"F j, Y, g:i a" }}</dd>
+            </div>
+            <div>
+              <dt class="opacity-60">Reason</dt>
+              <dd>{{ review.hidden_reason }}</dd>
+            </div>
+          </dl>
+          <form method="post" action="{% url 'reviews:manage_review_restore' review.pk %}" class="mt-4">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary btn-sm">Restore review</button>
+          </form>
+        {% else %}
+          <p class="text-sm opacity-70">Published and counted in the product's rating.</p>
+          <form method="post" action="{% url 'reviews:manage_review_hide' review.pk %}"
+                class="mt-2 space-y-3">
+            {% csrf_token %}
+            {% include "products/partials/_field.html" with field=hide_form.reason %}
+            <button type="submit" class="btn btn-error btn-sm">Hide review</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <a href="{% url 'reviews:manage_reviews' %}" class="btn btn-ghost btn-sm mt-8">← All reviews</a>
+{% endblock %}

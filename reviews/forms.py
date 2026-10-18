@@ -42,3 +42,16 @@ class ReviewForm(forms.ModelForm):
         if self.instance.pk and self.has_changed():
             self.instance.edited_at = timezone.now()
         return super().save(commit)
+
+
+class HideReviewForm(forms.Form):
+    """Staff's reason for hiding a review: required, trimmed, 1–200 characters."""
+
+    reason = forms.CharField(
+        max_length=200,
+        widget=forms.TextInput(attrs={"class": "input w-full"}),
+        error_messages={
+            "required": "Give a reason for hiding this review.",
+            "max_length": "Keep the reason to 200 characters or fewer.",
+        },
+    )

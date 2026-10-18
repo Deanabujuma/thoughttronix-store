@@ -9,12 +9,20 @@ from django.contrib import messages
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import IntegrityError, transaction
 from django.http import Http404
-from django.shortcuts import get_object_or_404, redirect
-from django.views.generic import CreateView, DeleteView, UpdateView
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views import View
+from django.views.generic import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    ListView,
+    UpdateView,
+)
 
+from accounts.mixins import StaffRequiredMixin
 from products.models import Product
 
-from .forms import ReviewForm
+from .forms import HideReviewForm, ReviewForm
 from .models import Review
 
 
@@ -129,3 +137,99 @@ class ReviewDeleteView(OwnReviewMixin, DeleteView):
         self.object.delete_by_author()
         messages.success(self.request, "Your review has been deleted.")
         return redirect(self.get_success_url())
+
+
+# --- The back office: moderation ---------------------------------------------
+#
+# Staff-only, like every back-office screen: anonymous → login, signed-in
+# non-staff (a review's own author included) → 403. Hide and restore are
+# POST-only views, so a GET is 405, and CSRF middleware guards the POSTs.
+
+
+class ManageReviewListView(StaffRequiredMixin, ListView):
+    """Every review, newest first, 25 a page, filterable via ``?status=``.
+
+    Only the model's own status values filter; anything else shows all.
+    A bad ``?page=`` is a 404, as on the other back-office lists.
+    """
+
+    template_name = "reviews/manage_reviews.html"
+    context_object_name = "reviews"
+    paginate_by = 25
+    extra_context = {"section": "reviews"}
+
+    def get_queryset(self):
+        reviews = Review.objects.select_related("product", "user", "hidden_by")
+        if self.active_status():
+            reviews = reviews.filter(status=self.active_status())
+        return reviews.order_by("-created_at", "-pk")
+
+    def active_status(self):
+        status = self.request.GET.get("status", "")
+        return status if status in Review.Status.values else ""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["statuses"] = Review.Status.choices
+        context["active_status"] = self.active_status()
+        return context
+
+
+class ManageReviewDetailView(StaffRequiredMixin, DetailView):
+    """One review in full, with its moderation controls."""
+
+    template_name = "reviews/manage_review_detail.html"
+    context_object_name = "review"
+    extra_context = {"section": "reviews"}
+    queryset = Review.objects.select_related("product", "user", "hidden_by")
+
+    def get_context_data(self, **kwargs):
+        kwargs.setdefault("hide_form", HideReviewForm())
+        return super().get_context_data(**kwargs)
+
+
+class HideReviewView(StaffRequiredMixin, View):
+    """POST-only: hide a review, with a reason.
+
+    An invalid reason shows the detail page again with the error. Hiding
+    an already-hidden review changes nothing — its original moderator,
+    time and reason stand.
+    """
+
+    def post(self, request, pk):
+        review = get_object_or_404(Review, pk=pk)
+        if review.status == Review.Status.HIDDEN:
+            return self.already_hidden(review)
+        form = HideReviewForm(request.POST)
+        if not form.is_valid():
+            return render(
+                request,
+                ManageReviewDetailView.template_name,
+                {"review": review, "hide_form": form, "section": "reviews"},
+            )
+        if not review.hide(request.user, form.cleaned_data["reason"]):
+            # Another moderator hid it between our read and our write.
+            return self.already_hidden(review)
+        messages.success(request, "Review hidden. It no longer appears in the store.")
+        return redirect("reviews:manage_review_detail", pk=review.pk)
+
+    def already_hidden(self, review):
+        messages.info(
+            self.request, "This review is already hidden; nothing was changed."
+        )
+        return redirect("reviews:manage_review_detail", pk=review.pk)
+
+
+class RestoreReviewView(StaffRequiredMixin, View):
+    """POST-only: publish a hidden review again. Restoring a published
+    review changes nothing and says so."""
+
+    def post(self, request, pk):
+        review = get_object_or_404(Review, pk=pk)
+        if review.restore():
+            messages.success(request, "Review restored. It appears in the store again.")
+        else:
+            messages.info(
+                request, "This review is already published; nothing was changed."
+            )
+        return redirect("reviews:manage_review_detail", pk=review.pk)

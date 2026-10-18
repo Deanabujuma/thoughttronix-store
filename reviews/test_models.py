@@ -160,3 +160,34 @@ def test_own_finds_only_the_visitors_review(customer, other_customer, product):
 
 def test_the_summary_of_a_product_without_reviews_is_empty(product):
     assert Review.objects.summary_for(product) == {"average": None, "count": 0}
+
+
+# --- Hiding -------------------------------------------------------------------
+
+
+def test_a_stale_hide_never_overwrites_the_first_moderators_record(
+    customer, staff_user, product
+):
+    """Two moderators loaded the review while it was published; the second
+    to write must leave the first one's moderator, time and reason alone."""
+    review = Review.objects.create(user=customer, product=product, rating=1)
+    first = get_user_model().objects.create_user(username="first", is_staff=True)
+    stale = Review.objects.get(pk=review.pk)  # still thinks it's published
+
+    assert review.hide(first, "Spam") is True
+    record = (review.hidden_by, review.hidden_at, review.hidden_reason)
+
+    assert stale.hide(staff_user, "A later reason") is False
+    assert (stale.hidden_by, stale.hidden_at, stale.hidden_reason) == record
+    assert stale.status == Review.Status.HIDDEN
+
+
+def test_a_stale_restore_changes_nothing_the_second_time(customer, staff_user, product):
+    review = Review.objects.create(user=customer, product=product, rating=1)
+    review.hide(staff_user, "Spam")
+    stale = Review.objects.get(pk=review.pk)  # still thinks it's hidden
+
+    assert review.restore() is True
+    assert stale.restore() is False
+    assert stale.status == Review.Status.PUBLISHED
+    assert (stale.hidden_by, stale.hidden_at, stale.hidden_reason) == (None, None, "")

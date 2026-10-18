@@ -28,6 +28,427 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-18 — Product reviews Phase 4: back-office moderation (hide and restore)
+
+### Prompts
+The same agent session as the Phase 3 entry below, which records its own
+prompts 1–12. Prompt text is verbatim. Prompts 1–3 staged, committed and
+pushed Phase 3; they are recorded here because that entry was already
+committed. Every prompt was pasted in, so `/implement` never ran as a
+command; the agent followed it and `/tdd` directly.
+
+1. I approve the proposed 8-file staging list for Product Reviews Phase 3.
+
+   Stage only these exact paths:
+   PROMPTS.md
+   products/models.py
+   products/views.py
+   templates/products/catalog.html
+   templates/reviews/partials/_reviews_section.html
+   reviews/test_display.py
+   reviews/test_pagination.py
+   reviews/test_catalog.py
+
+   Do not use git add . or git add -A.
+
+   After staging, show git diff --cached --name-only, git diff --cached
+   --stat, and git status --short. Verify there are exactly 8 staged files
+   and no databases, backups, generated CSS, or unrelated files.
+
+   Do not commit or push yet. Stop for my final review of the staged
+   changes.
+
+   Proposed future commit message: feat(reviews): add Phase 3 pagination
+   and catalog ratings.
+2. I give final approval to commit the 8 staged Product Reviews Phase 3
+   files.
+
+   Use this exact commit subject:
+   feat(reviews): add Phase 3 pagination and catalog ratings
+
+   You may include the repository's usual co-author trailer.
+
+   Do not stage any additional files, amend previous commits, or include
+   db.sqlite3, db.sqlite3.before-reviews-backup,
+   db.sqlite3.before-wishlist-backup, or generated CSS.
+
+   After committing, report the commit hash, git log -1 --oneline, and git
+   status --short. Confirm the 8 approved files were committed and all
+   database files were excluded.
+
+   Do NOT push to GitHub yet. Stop for my separate push approval. Do not
+   begin Phase 4.
+3. I approve pushing the existing Phase 3 commit
+   0cd0a12104513b0cd11a9455021d5bbdcfa92af5 to origin/main.
+
+   First confirm HEAD is exactly that commit, fetch origin, and verify the
+   push is a fast-forward with no unexpected remote changes. Then perform a
+   normal git push origin main. Do not force-push, amend, stage, or commit
+   anything else.
+
+   After pushing, report the remote push result, confirm local main and
+   origin/main point to the same commit, and show git status --short.
+
+   Preserve db.sqlite3, db.sqlite3.before-reviews-backup, and
+   db.sqlite3.before-wishlist-backup. Do not run seed, reset, or
+   migrations.
+
+   Stop after confirming the push. Do not begin Phase 4 until I give the
+   next instruction.
+4. Phase 3 has been successfully pushed to origin/main at commit
+   0cd0a12104513b0cd11a9455021d5bbdcfa92af5. Begin ONLY Phase 4 of the
+   approved Product Reviews PRD and implementation plan: staff review
+   moderation.
+
+   Follow the repository's .claude/skills/implement/SKILL.md and
+   .claude/skills/tdd/SKILL.md, including all approval checkpoints.
+
+   Before writing any tests or implementation code, review
+   prd/product-reviews.md and plans/product-reviews.md, then propose up to
+   three focused Phase 4 TDD behaviors for my approval. Cover staff-only
+   access to the back-office Reviews section, review
+   listing/filtering/pagination, and secure hide/restore moderation with a
+   required reason where specified by the PRD. Explicitly identify access
+   controls, POST/CSRF requirements, and published versus hidden
+   visibility.
+
+   Show the proposed RED/GREEN order and any open decisions, then STOP for
+   my approval before writing code.
+
+   Preserve db.sqlite3 and both existing database backups. Do not seed,
+   reset, migrate or modify the development database. Do not alter the
+   existing MindSync and SyncRest reviews. Use pytest's isolated test
+   database for fixtures.
+
+   Do not stage, commit, push, or begin Phase 5.
+5. I approve all three proposed Phase 4 TDD behaviors, their order (1 → 2 →
+   3), and all ten recommended open decisions.
+
+   Begin Phase 4 Behavior 1 RED ONLY: back-office review moderation must be
+   staff-only, with hide/restore actions POST-only and CSRF-protected.
+
+   Create only the minimal routes/view skeleton necessary for an
+   assertion-based RED test. Cover anonymous login redirects, authenticated
+   customer and author 403 responses, GET requests to hide/restore
+   returning 405, and POST requests without CSRF returning 403. Assert that
+   denied requests never modify the review. Follow existing
+   StaffRequiredMixin and back-office patterns.
+
+   Demonstrate a genuine assertion failure for the missing security
+   behavior, not a test collection/import error. Report the exact failing
+   assertion and test command. Stop for my approval before implementing
+   GREEN. Do not proceed to Behavior 2 or 3.
+
+   The insecure RED skeleton must remain test-only development work: don't
+   run it against the local development database or expose it through
+   browser testing before GREEN.
+
+   Preserve db.sqlite3, both backup files, and the existing MindSync and
+   SyncRest reviews. Use only pytest's isolated database fixtures. Do not
+   seed, reset, migrate, stage, commit, push, or begin Phase 5.
+6. I approve Phase 4 Behavior 1 RED exactly as demonstrated: 12 assertion
+   failures and 4 existing security checks passing.
+
+   Proceed with GREEN for Behavior 1 ONLY.
+
+   Apply the repository's existing StaffRequiredMixin access-control
+   pattern to all four review moderation views: list, detail, hide, and
+   restore. Ensure anonymous users redirect to login with the proper next
+   parameter and authenticated nonstaff users (including review authors)
+   receive 403. Keep hide and restore POST-only (GET must return 405 for
+   staff) and protected by Django CSRF middleware (POST without token must
+   return 403).
+
+   Run all 16 Behavior 1 test cases, relevant reviews/back-office
+   regression tests, the full pytest suite, and Ruff lint/format checks.
+   Report exact results, including any failures or fixes, and STOP for my
+   GREEN approval before beginning Behavior 2.
+
+   Do not implement moderation state changes or listing/filtering behavior
+   yet unless strictly required for Behavior 1 GREEN.
+
+   Preserve db.sqlite3 and both backups, including the existing MindSync
+   and SyncRest reviews. Use pytest's isolated database only. Do not seed,
+   reset, migrate, stage, commit, push, or begin Phase 5.
+7. I approve Phase 4 Behavior 1 GREEN. All 16 security cases pass, the full
+   710-test suite passes, and Ruff is clean.
+
+   Proceed with Phase 4 Behavior 2 RED ONLY: hiding a review requires a
+   valid moderation reason and preserves an accurate audit trail.
+
+   Write one focused parameterized TDD test using pytest's isolated
+   database. Cover a valid 1–200-character reason trimmed before saving,
+   changing a published review to HIDDEN, recording hidden_by and
+   hidden_at, rejecting blank/whitespace-only and over-200-character
+   reasons without changing the review, and making a second hide idempotent
+   without overwriting the original moderator, timestamp or reason. Verify
+   the appropriate detail-page error response or informational redirect
+   for each case.
+
+   Create only the minimal validation/action skeleton needed to demonstrate
+   a genuine assertion-based RED failure. Keep all existing Behavior 1
+   access controls, POST-only requirements, and CSRF protections in place.
+
+   Run the new test and report the exact failing assertions. STOP for my
+   approval before implementing GREEN, restoring reviews, or proceeding to
+   Behavior 3.
+
+   Do not modify, seed, reset, or migrate db.sqlite3 or either backup.
+   Preserve my MindSync and SyncRest reviews. Do not stage, commit, push,
+   or begin Phase 5.
+8. I approve Phase 4 Behavior 2 RED: all seven parameterized cases fail on
+   genuine assertions. I also approve the four exact message texts
+   proposed in the RED test.
+
+   Proceed with Behavior 2 GREEN ONLY.
+
+   Implement the hide-review action for staff with a required, trimmed
+   1–200-character reason. For a valid reason, atomically transition a
+   PUBLISHED review to HIDDEN and record hidden_by, hidden_at, and
+   hidden_reason. Redirect to the back-office review detail with the
+   approved success message.
+
+   For blank, whitespace-only, or over-200-character reasons, render the
+   detail page with HTTP 200 and the exact approved validation message. Do
+   not change the review or audit fields. For an already-hidden review,
+   leave its original reason, moderator, and timestamp unchanged and show
+   the exact approved informational message. Ensure repeated/concurrent
+   hide requests cannot overwrite the original audit trail.
+
+   Keep all Behavior 1 staff-only, POST-only, and CSRF protections. Do not
+   implement restore behavior or public hidden-review presentation yet;
+   those belong to subsequent work.
+
+   Run all seven Behavior 2 cases, the 16 Behavior 1 security cases,
+   relevant reviews/back-office regressions, the full pytest suite, and
+   Ruff lint/format. Report exact results and STOP for GREEN approval
+   before beginning Behavior 3.
+
+   Preserve db.sqlite3, both backups, and my existing MindSync and SyncRest
+   reviews. Use pytest's isolated database only. Do not seed, reset,
+   migrate, stage, commit, push, or begin Phase 5.
+9. I approve Phase 4 Behavior 2 GREEN. All seven moderation cases, the 16
+   security cases, and the concurrent-hide regression pass. The full
+   718-test suite passes, and Ruff is clean.
+
+   Proceed with Phase 4 Behavior 3 RED ONLY: a hidden review disappears
+   from all public review listings and rating summaries but remains
+   visible to its author with the staff moderation reason.
+
+   Write one focused parameterized TDD test using pytest's isolated
+   database. Confirm that anonymous visitors and other customers cannot see
+   the hidden review's comment or reason, that it is excluded from the
+   product-detail published review list and published-only rating
+   average/count, and that catalog and category cards also exclude it.
+   Confirm the author still sees their own hidden review pinned under Your
+   review, labeled 'Hidden by staff: <reason>' with the reason safely
+   HTML-escaped, and with Delete but not Edit. Verify that a hidden review
+   is not treated as a published review for public summaries. Include the
+   expected after-restore public visibility in the test if it can be
+   demonstrated without implementing restore yet; otherwise leave restore
+   behavior for normal Phase 4 work.
+
+   Use the existing published() queryset and current author-display
+   behavior where appropriate. Write the minimum RED test, run it, and show
+   genuine assertion failures. STOP for my RED approval before
+   implementing GREEN.
+
+   Preserve all Behavior 1 access checks, POST-only actions, CSRF
+   protections, and Behavior 2 hide/audit functionality. Do not implement
+   restore, listing/filtering/pagination, or the Reviews tab yet unless
+   essential for RED.
+
+   Do not modify, seed, reset, or migrate db.sqlite3 or either backup.
+   Preserve my existing MindSync and SyncRest reviews. Do not stage,
+   commit, push, or begin Phase 5.
+10. I approve Phase 4 Behavior 3 RED exactly as demonstrated: 1 genuine
+    assertion failure and 2 passing public-visibility cases.
+
+    Proceed with Behavior 3 GREEN ONLY.
+
+    Update the signed-in author's pinned Your review section so that when
+    their review has HIDDEN status, it visibly displays 'Hidden by staff:
+    <reason>' using Django's normal template escaping. Ensure any HTML in
+    the reason renders as text, never markup or executable content.
+
+    Preserve the current published-only behavior: anonymous visitors and
+    other customers must not see the hidden review or reason, and hidden
+    reviews must not contribute to product detail, catalog, or category
+    rating counts and averages. The author must see their hidden review
+    exactly once, with Delete available but Edit unavailable.
+
+    Keep the implementation minimal and reuse the existing review
+    partial/template wherever appropriate. Do not implement restore, staff
+    listing/filtering/pagination, or the Reviews tab yet; those are
+    remaining normal Phase 4 work.
+
+    Run all three Behavior 3 cases, all 23 Behavior 1/2 cases, the
+    concurrency regression, relevant reviews/products/back-office tests,
+    the full pytest suite, and Ruff lint/format checks. Report exact
+    results and STOP for my GREEN approval before continuing normal Phase 4
+    work.
+
+    Do not modify, seed, reset, or migrate db.sqlite3 or either backup.
+    Preserve my MindSync and SyncRest reviews. Do not stage, commit, push,
+    or begin Phase 5.
+11. I approve Phase 4 Behavior 3 GREEN. All three cases pass, the full
+    721-test suite passes, and Ruff is clean. All three Phase 4 TDD cycles
+    are complete.
+
+    Proceed with the remaining normal Phase 4 work according to
+    prd/product-reviews.md and plans/product-reviews.md:
+
+    1. Implement staff-only review listing with 25 reviews per page,
+    newest-first ordering, a validated ?status= filter (PUBLISHED/HIDDEN),
+    filter preservation across pagination, the required columns, an
+    approximately 80-character excerpt, proper empty states, and 'Former
+    staff member' when the hiding moderator no longer exists.
+    2. Complete the back-office review detail page with the information and
+    moderation controls required by the PRD. Include the Reviews navigation
+    tab between Discount codes and Dashboard. Do not provide any staff
+    delete action.
+    3. Implement restore through a staff-only, POST-only, CSRF-protected
+    action. Restoring must return the review to PUBLISHED and clear the
+    hidden moderation fields as specified by the PRD. A second restore
+    should make no changes and show an informational message. Verify that
+    restored reviews appear again publicly and contribute to published-only
+    ratings.
+    4. Add focused normal regression tests for listing/filtering/pagination,
+    invalid filter values, empty states, detail content, navigation
+    placement, restore and restore-twice, and moderation permissions.
+    Preserve the completed TDD behaviors and audit-trail protections.
+    5. Verify any new template classes against the existing compiled CSS
+    without rebuilding Tailwind or changing Windows security settings.
+
+    Run the full pytest suite, Ruff lint and formatting, Django system
+    checks, and makemigrations --check --dry-run. Report exact results and
+    any deviations.
+
+    Then STOP with precise browser verification steps. Do not hide or
+    restore my real MindSync or SyncRest reviews automatically; use
+    isolated pytest fixtures for all moderation testing. We can explicitly
+    decide whether to do a temporary manual moderation test later.
+
+    Do not modify, seed, reset, or migrate db.sqlite3 or either backup. Do
+    not stage, commit, push, or begin Phase 5.
+12. Phase 4 browser verification is complete. I verified the staff Reviews
+    tab and detail page, Published/Hidden/invalid status filters, the
+    anonymous login redirect, and that a signed-in customer receives 403
+    Forbidden. I did not hide or restore either real review; those actions
+    are verified through isolated pytest tests.
+
+    Please complete the Phase 4 PROMPTS.md entry required by /implement.
+    Document the three RED/GREEN TDD cycles, normal implementation work,
+    moderation security decisions, browser verification, test results, and
+    any deviations or troubleshooting.
+
+    Then rerun the full pytest suite, Ruff lint/formatting, Django system
+    checks, and makemigrations --check --dry-run. Show git status --short,
+    the exact proposed files to stage, and a concise diff/stat.
+
+    Do not stage, commit, or push yet. Explicitly exclude db.sqlite3,
+    db.sqlite3.before-reviews-backup, db.sqlite3.before-wishlist-backup,
+    generated CSS, and unrelated files. Preserve my existing MindSync and
+    SyncRest reviews and all other local data.
+
+    STOP for my approval of the staging list. Do not begin Phase 5.
+
+### Summary
+- **Outcome:** staff have a Reviews tab where they can find any review,
+  hide it with a recorded reason, and restore it. Hidden reviews leave
+  public view everywhere, but their authors still see them, marked.
+  - **Phase 3 commit (prompts 1–3):** the 8 reviewed files were staged by
+    path and committed as `0cd0a12`, a new commit on top of `807faf8`. It
+    was pushed to `origin/main` as a fast-forward after a fresh fetch
+    showed no unexpected remote changes.
+  - **Planning (prompts 4–5):** the agent first read the Orders and
+    Discount codes back office. It proposed three behaviors and ten
+    decisions, and the developer approved all of them:
+    - `?status=` takes the model's own values, and anything else shows all;
+    - GET to an action gives 405;
+    - actions redirect to the detail page;
+    - an invalid reason re-shows the detail page with 200;
+    - a bad `?page=` gives 404, like Orders;
+    - staff see hidden reviews only in the back office;
+    - a promoted author may moderate their own review;
+    - a superuser without `is_staff` gets 403;
+    - restoring doesn't depend on eligibility;
+    - deleting a hidden review still just deletes it until Phase 5.
+
+    Listing, filtering and paging were kept out of TDD, because the Orders
+    pattern already settles them; they were built and tested normally.
+  - **TDD (prompts 5–10):** three approved behaviors, each RED on an
+    assertion, then GREEN with the full suite run:
+    1. **Staff-only, POST-only and CSRF-protected.** One test with 16
+       cases. Anonymous visitors are sent to login with `next`. Another
+       customer and the review's own author get 403 on the list, detail,
+       hide and restore. Staff get 405 for a GET to hide or restore, and
+       403 for a POST without a CSRF token. No refused request changes the
+       review. RED used a skeleton built deliberately **without** the staff
+       check, run only by pytest, and 12 cases failed. The 405 and CSRF
+       cases already passed, because they come from the POST-only `View`
+       pattern and Django's middleware. GREEN added `StaffRequiredMixin` to
+       all four views.
+    2. **A required reason and an accurate record.** One test with seven
+       cases: a trimmed reason, 1 and 200 characters, blank, whitespace,
+       201 characters, and already hidden. The developer approved the four
+       message texts. GREEN added `HideReviewForm`, plus `Review.hide()`:
+       one conditional UPDATE (`filter(pk, status=PUBLISHED).update(...)`),
+       so a second or concurrent hide can never overwrite the original
+       moderator, time or reason. A model test with a stale copy proves the
+       race.
+    3. **Hidden from the public, visible to its author.** One test with
+       three cases (anonymous, another customer, the author). The review is
+       hidden through the real staff action, with the reason
+       `<b>Spam</b> & links`. `published()` already kept it out of the
+       product list, the summaries and the catalog and category cards, so
+       only the author case failed. GREEN added an auto-escaped
+       "Hidden by staff: <reason>" alert to the pinned "Your review" area.
+  - **Normal Phase 4 work (prompt 11):**
+    - `Review.restore()`, the same conditional-UPDATE design as `hide()`.
+    - The restore view, with a success message and an info message for
+      restoring twice.
+    - The list: 25 a page, newest first, the validated filter kept across
+      pages, the required columns, the 80-character excerpt, "Former staff
+      member", and both empty states.
+    - The detail page: the full escaped comment, the dates, the moderation
+      record, and Hide or Restore. There's no delete anywhere.
+    - The Reviews tab between Discount codes and Dashboard, and a shared
+      `_moderation_status.html` partial.
+    - 22 normal tests, including a stale-restore model test.
+    - The suite went from 694 to 743.
+  - **Browser verification (prompt 12):** done by the developer as staff, a
+    customer and a signed-out visitor: the tab, the detail page, the
+    Published, Hidden and invalid filters, the login redirect, and the 403.
+    Neither real review was hidden or restored; those actions were tested
+    only in pytest's isolated database.
+- **Deviations:**
+  - The insecure Behavior 1 skeleton existed only in the working tree until
+    its GREEN, as the developer required. It was never served from
+    `db.sqlite3` or opened in a browser.
+  - Actually hiding and restoring, the author's "Hidden by staff" label,
+    "Former staff member", and paging past 25 were tested rather than
+    checked in the browser, to protect the developer's real reviews. A
+    temporary manual moderation test was offered for later.
+- **Sideways:**
+  - **Two drafts of the Behavior 1 test.** The first draft was two test
+    functions. The agent merged them into one test with an explicit case
+    list, to keep `/tdd`'s rule of one test per behavior.
+  - **A test sent a body with its GETs.** Behavior 1's first GREEN run had
+    14 of 16 passing. The test sent `{"reason": "Spam"}` with every
+    request, and on a GET that became the query string, so the login
+    `next` included it. That was a mechanical setup fix, sending the reason
+    only with POSTs; no assertion changed.
+  - **Failed shell commands.** One combined check command failed to parse,
+    because PowerShell broke on the embedded bash quoting; it was rerun
+    split. A Bash heredoc holding the normal tests also failed to parse, so
+    nothing was appended. The agent confirmed the file was unchanged, then
+    wrote the tests with the Write tool and appended them.
+  - **Missing CSS classes.** `mb-2` and `btn-warning` aren't in the
+    compiled CSS. They were replaced with `mb-4` and `btn-error`. The CSS
+    check's other "MISSING" lines were template code, and a direct check
+    confirmed the two `lg:` classes are present.
+
 ## 2026-10-18 — Product reviews Phase 3: review pagination and catalog ratings
 
 ### Prompts

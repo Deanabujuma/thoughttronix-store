@@ -184,6 +184,45 @@ class Review(models.Model):
         """Whether ``user`` is this review's signed-in author."""
         return user.is_authenticated and self.user_id == user.pk
 
+    def hide(self, by, reason):
+        """Hide this review, recording who hid it, when and why.
+
+        Returns whether it was hidden now. Only a published review changes:
+        one conditional UPDATE does the check and the write together, so a
+        repeated or concurrent hide can never overwrite the original
+        moderator, time or reason.
+        """
+        hidden = (
+            Review.objects.filter(pk=self.pk, status=self.Status.PUBLISHED).update(
+                status=self.Status.HIDDEN,
+                hidden_by=by,
+                hidden_at=timezone.now(),
+                hidden_reason=reason,
+            )
+            == 1
+        )
+        self.refresh_from_db()
+        return hidden
+
+    def restore(self):
+        """Publish a hidden review again, clearing its moderation record.
+
+        Returns whether it was restored now. Like ``hide``, one conditional
+        UPDATE does the check and the write, so restoring twice — or two
+        moderators at once — changes nothing the second time.
+        """
+        restored = (
+            Review.objects.filter(pk=self.pk, status=self.Status.HIDDEN).update(
+                status=self.Status.PUBLISHED,
+                hidden_by=None,
+                hidden_at=None,
+                hidden_reason="",
+            )
+            == 1
+        )
+        self.refresh_from_db()
+        return restored
+
     def delete_by_author(self):
         """Delete at the author's request — the only path the customer
         delete view uses. The Django admin's own delete stays separate."""

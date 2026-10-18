@@ -1,0 +1,12 @@
+{# A review's status for staff, with who hid it and when. Include with #}
+{# review=<Review>. A deleted moderator leaves hidden_by NULL, shown as #}
+{# "Former staff member"; the review stays hidden either way. #}
+{% if review.status == "HIDDEN" %}
+  <span class="badge badge-warning">Hidden</span>
+  <span class="text-sm opacity-70">
+    Hidden by {% if review.hidden_by %}{{ review.hidden_by.username }}{% else %}Former staff member{% endif %}
+    on {{ review.hidden_at|date:"M j, Y" }}
+  </span>
+{% else %}
+  <span class="badge badge-success badge-outline">Published</span>
+{% endif %}

@@ -1,0 +1,98 @@
+{% extends "backoffice/base.html" %}
+{% load review_extras %}
+
+{% block title %}Reviews — Back office{% endblock %}
+
+{% block backoffice %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+    <h2 class="text-xl font-semibold">
+      {{ page_obj.paginator.count }} review{{ page_obj.paginator.count|pluralize }}
+    </h2>
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      <span class="opacity-60">Status:</span>
+      <a href="{% querystring status=None page=None %}"
+         class="badge {% if not active_status %}badge-primary{% else %}badge-ghost{% endif %}">
+        all
+      </a>
+      {% for value, label in statuses %}
+        <a href="{% querystring status=value page=None %}"
+           class="badge {% if active_status == value %}badge-primary{% else %}badge-ghost{% endif %}">
+          {{ label }}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if reviews %}
+    <div class="overflow-x-auto rounded-box bg-base-100 shadow-md">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Customer</th>
+            <th>Rating</th>
+            <th>Comment</th>
+            <th>Posted</th>
+            <th>Status</th>
+            <th><span class="sr-only">Details</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for review in reviews %}
+            <tr>
+              <td>
+                <a href="{{ review.product.get_absolute_url }}" class="link-hover">{{ review.product.name }}</a>
+              </td>
+              <td>{{ review.user.username }}</td>
+              <td>
+                <span class="text-warning" aria-hidden="true">{{ review.rating|star_glyphs }}</span>
+                <span class="sr-only">Rated {{ review.rating }} out of 5</span>
+              </td>
+              <td>{{ review.comment|truncatechars:80 }}</td>
+              <td>{{ review.created_at|date:"M j, Y" }}</td>
+              <td>{% include "reviews/partials/_moderation_status.html" %}</td>
+              <td>
+                <a href="{% url 'reviews:manage_review_detail' review.pk %}" class="btn btn-ghost btn-sm">View</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_paginated %}
+      <div class="mt-8 flex justify-center">
+        <div class="join">
+          {% if page_obj.has_previous %}
+            <a href="{% querystring page=page_obj.previous_page_number %}" class="btn join-item">«</a>
+          {% else %}
+            <button class="btn join-item btn-disabled">«</button>
+          {% endif %}
+          <button class="btn join-item pointer-events-none">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+          </button>
+          {% if page_obj.has_next %}
+            <a href="{% querystring page=page_obj.next_page_number %}" class="btn join-item">»</a>
+          {% else %}
+            <button class="btn join-item btn-disabled">»</button>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="py-16 text-center">
+      {% if active_status %}
+        <p class="text-5xl">🗂️</p>
+        <p class="mt-4 text-xl font-semibold">No reviews with that status</p>
+        <p class="mt-2 opacity-70">Nothing to see here. Literally.</p>
+        <a href="{% querystring status=None page=None %}" class="btn btn-primary btn-sm mt-6">
+          Show all reviews
+        </a>
+      {% else %}
+        <p class="text-5xl">⭐</p>
+        <p class="mt-4 text-xl font-semibold">No reviews yet</p>
+        <p class="mt-2 opacity-70">Customers are still forming opinions. We'll hear them.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}
