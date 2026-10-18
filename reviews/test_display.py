@@ -358,3 +358,14 @@ def test_an_order_status_change_leaves_the_review_public(
 
     assert "Still counts" in page
     assert 'aria-label="Rated 5.0 out of 5, 1 review"' in page
+
+
+def test_the_summary_still_counts_the_authors_pinned_review(
+    client, customer, product, delivered_order
+):
+    """Left out of the public list, but never out of the average or count."""
+    Review.objects.create(user=customer, product=product, rating=5)
+    Review.objects.create(user=reviewer("ana"), product=product, rating=2)
+    client.force_login(customer)
+
+    assert 'aria-label="Rated 3.5 out of 5, 2 reviews"' in page_for(client, product)

@@ -28,6 +28,355 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-18 — Product reviews Phase 3: review pagination and catalog ratings
+
+### Prompts
+The same agent session as the Phase 2 entry below, which records its own
+prompts 1–13. Prompt text is verbatim. Prompts 1–3 staged, committed and
+pushed Phase 2; they are recorded here because that entry was already
+committed. Every prompt was pasted in, including prompt 4, so `/implement`
+never ran as a command; the agent followed its steps directly.
+
+1. I approve the proposed 13-file staging list for Product Reviews Phase 2.
+
+   Stage only these exact paths:
+   PROMPTS.md
+   products/views.py
+   reviews/forms.py
+   reviews/models.py
+   reviews/urls.py
+   reviews/views.py
+   reviews/test_display.py
+   reviews/test_eligibility.py
+   reviews/test_views.py
+   templates/reviews/partials/_review.html
+   templates/reviews/partials/_reviews_section.html
+   templates/reviews/review_form.html
+   templates/reviews/review_confirm_delete.html
+
+   Do not use git add . or git add -A.
+
+   After staging, show git diff --cached --name-only, git diff --cached
+   --stat, and git status --short. Verify there are exactly 13 staged files
+   and no database, backup, compiled CSS, or unrelated files.
+
+   Do not commit or push yet. Stop for my final review of the staged
+   changes.
+
+   Proposed future commit message: feat(reviews): add Phase 2 review
+   editing and deletion.
+2. I give final approval to commit the 13 staged Product Reviews Phase 2
+   files.
+
+   Use this exact commit subject:
+   feat(reviews): add Phase 2 review editing and deletion
+
+   You may include the repository's usual co-author trailer.
+
+   Do not stage additional files, amend previous commits, or include
+   db.sqlite3, db.sqlite3.before-reviews-backup,
+   db.sqlite3.before-wishlist-backup, or generated CSS.
+
+   After committing, show the commit hash, git log -1 --oneline, and git
+   status --short. Confirm that the 13 approved files were committed and
+   the database files remain outside this commit.
+
+   Do NOT push to GitHub yet. Stop for my separate push approval. Do not
+   begin Phase 3.
+3. I approve pushing the existing Phase 2 commit
+   807faf81a53aea9766234d1a7b2590533db542e9 to origin/main.
+
+   First verify HEAD is that commit, fetch origin, and confirm the push is a
+   fast-forward with no unexpected remote changes. Then perform a normal
+   git push origin main. Do not force-push, amend, stage, or commit
+   anything else.
+
+   Afterward, report the push result, confirm local main and origin/main
+   point to the same commit, and show git status --short.
+
+   Preserve db.sqlite3, db.sqlite3.before-reviews-backup, and
+   db.sqlite3.before-wishlist-backup exactly as they are. Do not run seed,
+   reset, or migrations.
+
+   Stop after confirming the push. Do not begin Phase 3 until I give the
+   next instruction.
+4. Implement only Phase 3 of the approved Product Reviews PRD and plan,
+   following /implement and every /tdd approval checkpoint.
+
+   Before writing tests or implementation code, propose up to three Phase 3
+   TDD behaviors for my approval. Include 10-reviews-per-page pagination
+   with 11+ reviews created only in an isolated test database; graceful
+   handling of invalid and out-of-range page parameters; and correct
+   published-only catalog rating/count annotations under search and
+   filters, with an appropriate query-count regression.
+
+   Preserve the existing MindSync review and all development database
+   records. Do not seed, reset, migrate, or alter db.sqlite3 or either
+   backup. Do not create 11+ reviews in my development database; use pytest
+   fixtures only.
+
+   Do not stage, commit, push, or begin Phase 4. Stop for approval before
+   each RED and GREEN step, and before browser verification.
+5. I approve all three proposed Phase 3 TDD behaviors and their order.
+
+   Begin Behavior 1 RED only: 10 published reviews per page, newest first,
+   with the 11th review appearing on page 2.
+
+   Build the minimum pagination skeleton normally, then write and run the
+   RED test. Use 11 separate eligible customers with qualifying Delivered
+   orders in pytest's isolated test database only. Verify page 1 shows
+   exactly the 10 newest reviews, page 2 shows only the oldest review, and
+   that a signed-in author's pinned review is not duplicated in the
+   paginated public list.
+
+   Preserve ordering by created_at descending with pk as the tie-breaker,
+   and use the ?reviews=2#reviews URL convention.
+
+   Stop after demonstrating the expected RED assertion failure. Do not
+   implement GREEN until I approve it.
+
+   Do not seed, migrate, reset, or modify db.sqlite3 or either database
+   backup. Do not stage, commit, push, or begin another behavior or phase.
+6. I approve the Phase 3 Behavior 1 RED test, including both anonymous and
+   signed-in author cases.
+
+   Proceed with GREEN for Behavior 1 only. Implement server-side pagination
+   of the published public review list at exactly 10 reviews per page,
+   ordered by -created_at and -pk. Keep the signed-in author's own review
+   pinned separately on every page and excluded from the paginated public
+   queryset, with no duplication.
+
+   Use the reviews query parameter without interfering with other
+   product-page behavior. Preserve the one-decimal published-only rating
+   summary, which must include the author's published review even when
+   excluded from the public list.
+
+   Run both Behavior 1 cases, the reviews app regression tests, the
+   complete suite, and Ruff lint/format checks. Report exact results and
+   STOP for my GREEN approval before Behavior 2.
+
+   Leave invalid page parameter handling for Behavior 2's TDD cycle and
+   Newer/Older navigation links for the remaining normal Phase 3 work,
+   unless strictly necessary for the minimum GREEN implementation.
+
+   Do not modify, seed, reset or migrate my development database or either
+   backup. Do not stage, commit, push, or begin Phase 4.
+7. I approve Phase 3 Behavior 1 GREEN. The full 679-test suite passes, and
+   Ruff is clean.
+
+   Proceed with Behavior 2 RED only: invalid and out-of-range review
+   pagination parameters must be handled gracefully.
+
+   Using the existing isolated 11-review test fixture, write and run an
+   assertion-based RED test verifying that ?reviews=abc returns HTTP 200
+   with page 1 (10 newest reviews), while ?reviews=99 returns HTTP 200 with
+   the last page (the oldest review). Also cover zero or negative page
+   numbers if appropriate to the approved PRD.
+
+   Do not implement GREEN until I approve the RED results. Keep all tests
+   in the isolated pytest database.
+
+   Do not modify, migrate, seed, or reset db.sqlite3 or either backup. Do
+   not stage, commit, push, or begin Behavior 3 or Phase 4.
+8. I approve Phase 3 Behavior 2 RED and all five test cases exactly as
+   written.
+
+   I confirm the pagination behavior: non-numeric or empty reviews
+   parameters display page 1; out-of-range numbers, including 0 and
+   negatives, display the last page. All cases must return HTTP 200.
+
+   Proceed with GREEN for Behavior 2 only. Use Django's
+   Paginator.get_page() if appropriate, preserving the
+   10-reviews-per-page behavior, newest-first ordering, and separately
+   pinned author review.
+
+   Run all five Behavior 2 cases, the Behavior 1 pagination regressions,
+   all reviews tests, the full regression suite, and Ruff lint/format
+   checks. Report exact results and STOP for my GREEN approval before
+   starting Behavior 3.
+
+   Do not modify, seed, migrate, or reset db.sqlite3 or either backup. Do
+   not stage, commit, push, or begin Phase 4.
+9. I approve Phase 3 Behavior 2 GREEN. All 684 tests pass, and Ruff is
+   clean.
+
+   Proceed with Behavior 3 RED only: product catalog cards must display
+   accurate published-only review averages and counts under combined
+   search and tag/category filters, without N+1 database queries.
+
+   Build the minimum normal skeleton for ProductQuerySet.with_ratings() and
+   the catalog card rating summary if needed. Then write and run an
+   assertion-based RED test using isolated pytest fixtures with multiple
+   products, published and hidden reviews, and products sharing tags.
+   Verify that filters and search return the correct products without
+   duplicating review counts, that hidden reviews do not affect averages,
+   that zero-review products show the empty state, and that the number of
+   database queries does not increase proportionally with the number of
+   cards.
+
+   Keep the query-count assertion practical and deterministic, measuring
+   the same catalog request shape for smaller and larger result sets. Do
+   not assume a specific total query count without inspecting the existing
+   view's expected queries.
+
+   Stop after demonstrating the expected RED failure. Do not implement
+   GREEN until I approve it.
+
+   Do not modify, seed, reset, or migrate db.sqlite3 or either backup. Do
+   not stage, commit, push, or begin Phase 4.
+10. I approve the Phase 3 Behavior 3 RED test exactly as written, including
+    the catalog and category scenarios and the measured query-count
+    comparison.
+
+    Proceed with GREEN for Behavior 3 only.
+
+    Implement ProductQuerySet.with_ratings() with efficient database-side
+    annotations for published-only review average and count. Make sure
+    joining or filtering by multiple tags cannot inflate the counts or
+    averages, and preserve correct product search, category, and tag
+    filtering. Keep zero-review cards showing No reviews yet. Do not make
+    one rating query per product card.
+
+    Run the approved catalog test, query-count regression, relevant
+    reviews/products tests, the full regression suite, and Ruff lint/format
+    checks. Report the exact results and STOP for my GREEN approval before
+    continuing the remaining normal Phase 3 work.
+
+    Do not modify, seed, migrate, or reset db.sqlite3 or either backup. Do
+    not stage, commit, push, or begin Phase 4.
+11. I approve Phase 3 Behavior 3 GREEN. All 685 tests pass, and Ruff is
+    clean. All three Phase 3 TDD cycles are complete.
+
+    Proceed with the remaining normal Phase 3 work according to
+    prd/product-reviews.md and plans/product-reviews.md:
+
+    1. Implement accessible Newer/Older review pagination links pointing to
+    ?reviews=N#reviews. Show only appropriate links at the beginning/end of
+    the pagination, and preserve the separately pinned Your review section.
+    2. Verify that catalog and category cards display published-only
+    ratings for unavailable products too, and show No reviews yet for
+    products with no published reviews.
+    3. Add focused tests for navigation links, pagination boundaries,
+    author pinning, unavailable products, and any relevant filter/query
+    regressions.
+    4. Check that all classes used in the new templates exist in the
+    current compiled CSS without rebuilding Tailwind or changing Windows
+    security settings.
+
+    Run the full regression suite, Ruff lint, Ruff format, Django system
+    checks, and makemigrations --check --dry-run. Fix any failures.
+
+    Then STOP and give me Phase 3 browser verification instructions. The
+    existing development database has only my MindSync review, so do not
+    create 11+ reviews there. Pagination with 11+ reviews must be verified
+    using isolated pytest fixtures only.
+
+    Do not modify, seed, reset, or migrate db.sqlite3 or either database
+    backup. Do not stage, commit, push, or begin Phase 4.
+12. Phase 3 browser verification is complete. I confirmed MindSync and
+    SyncRest catalog ratings, MindSync search results, both bestseller and
+    implant tag filters, and invalid review page parameters (?reviews=abc,
+    ?reviews=99, ?reviews=-1) all work correctly. The 11-review and
+    21-review pagination cases are covered by isolated automated tests.
+
+    Please complete the Phase 3 PROMPTS.md entry required by /implement.
+    Document the three TDD cycles, implementation decisions, browser
+    verification, test results, and any deviations or troubleshooting.
+
+    Then rerun the full pytest suite, Ruff lint and formatting, Django
+    system checks, and makemigrations --check --dry-run. Show git status
+    --short, the exact proposed files to stage, and a concise diff/stat.
+
+    Do not stage, commit, or push yet. Explicitly exclude db.sqlite3,
+    db.sqlite3.before-reviews-backup, db.sqlite3.before-wishlist-backup,
+    and generated CSS. Preserve my existing MindSync and SyncRest reviews
+    and all other local data.
+
+    Stop for my approval of the staging list. Do not start Phase 4.
+
+### Summary
+- **Outcome:** product pages show reviews 10 at a time with Newer and Older
+  links, and catalog and category cards show each product's rating.
+  - **Phase 2 commit (prompts 1–3):** the 13 reviewed files were staged by
+    path and committed as `807faf8`, a new commit on top of `47160b0`. It
+    was pushed to `origin/main` as a fast-forward after a fresh fetch
+    showed no unexpected remote changes.
+  - **TDD (prompts 5–10):** three approved behaviors, each RED on an
+    assertion, then GREEN with the full suite run:
+    1. **10 reviews a page, newest first, the oldest on page 2.** A fixture
+       builds 11 regular customers, each with their own Delivered order and
+       one published review, in the test database only. Viewed anonymously
+       and as an author whose own review is the newest of all. GREEN paged
+       the public list with Django's `Paginator` on `?reviews=N`, ordered
+       `-created_at, -pk`, with the author's review excluded before paging.
+       A regression test confirms the rating summary still counts that
+       review.
+    2. **Bad page numbers never error.** `abc` and an empty value go to
+       page 1; `99`, `0` and `-1` go to the last page, all with 200. The
+       agent asked about 0 and negatives before GREEN. The PRD's "an
+       out-of-range page shows the last page" covers them, and the
+       developer confirmed it. GREEN was one change: `Paginator.page()` to
+       `get_page()`.
+    3. **Catalog and category cards show published-only ratings under
+       search and tag filters, with a fixed query count.** Halo One has two
+       tags and a hidden review. Halo Three has no reviews, and Quiet Box is
+       excluded by the search. The same filtered request is measured at 3
+       and 9 cards. GREEN gave `ProductQuerySet.with_ratings()` two
+       correlated subqueries over published reviews, so no tag or search
+       join can repeat rows, and `Coalesce(…, 0)` for products without
+       reviews. `Review` is imported inside the method, because
+       `reviews.models` already imports `products.models`.
+  - **Normal Phase 3 work (prompt 11):**
+    - A `<nav aria-label="Review pages">`: "← Newer reviews" (`rel="prev"`)
+      only when there's a newer page, "Page X of Y", and "Older reviews →"
+      (`rel="next"`) only when there's an older one. Both link to
+      `?reviews=N#reviews`, and the nav is hidden when one page is enough.
+    - Tests for each link boundary: a 21-review middle page, a fallback
+      page's links, no links for 10 reviews, the author pinned above the
+      links on both pages, an unavailable product's rating on catalog and
+      category pages, an all-hidden product showing "No reviews yet", and
+      ratings on the catalog's own `?page=2`.
+    - Every class used by the new templates exists in the compiled CSS.
+      Tailwind was not rebuilt.
+    - 18 new tests; the suite went from 676 to 694.
+  - **Browser verification (prompt 12):** done by the developer:
+    - MindSync and SyncRest ratings on the catalog;
+    - a MindSync search;
+    - the bestseller and implant tag filters;
+    - `?reviews=abc`, `?reviews=99` and `?reviews=-1`.
+
+    Pagination with 11 and 21 reviews was verified only in pytest's
+    isolated database.
+- **Deviations:**
+  - The browser couldn't show page links or an unavailable product with a
+    rating without adding reviews to the developer's data, so tests cover
+    both.
+  - `/implement` was followed manually; every prompt was pasted.
+- **Sideways:**
+  - **A temporary 500 between Behaviors 1 and 2.** Behavior 1's
+    `Paginator.page()` turned `?reviews=abc` and `?reviews=99` from ignored
+    into a 500, because Behavior 2 was to define the fix. The agent
+    disclosed this at Behavior 1's GREEN. `get_page()` closed it at
+    Behavior 2.
+  - **Measuring before trusting the query count.** The developer asked for
+    the existing view's queries to be inspected first. The agent wrote a
+    throwaway probe test, ran it once (5 queries at both 3 and 9 cards:
+    product count, categories, tags, products, tag prefetch), and deleted
+    it before reporting RED.
+  - **An unfinished test.** The first draft of the catalog second-page
+    test never checked a rating and had a stray comment. It was rewritten
+    before any run.
+  - **Small fixes:** an `HTTPStatus` import landed above `datetime` and was
+    reordered for Ruff; a `.format()` call became an f-string.
+  - **A noisy CSS check.** It reported false "MISSING" classes: template
+    code inside `catalog.html`'s existing class attributes, and variant
+    classes such as `hover:shadow-xl` that its pattern didn't escape. A
+    plain-text search confirmed every one exists.
+  - **The developer's note was off by one review.** Prompt 11 said the
+    database held only the MindSync review. A read-only check found a
+    published SyncRest review too, left from the Phase 2 browser check.
+    The browser steps were written for both.
+
 ## 2026-10-18 — Product reviews Phase 2: edit and delete your own review
 
 ### Prompts

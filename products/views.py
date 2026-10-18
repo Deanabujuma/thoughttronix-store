@@ -1,4 +1,5 @@
 from django.contrib.messages.views import SuccessMessageMixin
+from django.core.paginator import Paginator
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -18,6 +19,8 @@ from wishlist.models import Wishlist
 from .forms import CategoryForm, ProductForm, TagForm
 from .models import Category, Product, Tag
 
+REVIEWS_PER_PAGE = 10
+
 
 class CatalogView(ListView):
     """The public product catalog: search, tag and category filters, pagination.
@@ -31,7 +34,11 @@ class CatalogView(ListView):
     paginate_by = 12
 
     def get_queryset(self):
-        products = Product.objects.select_related("category").prefetch_related("tags")
+        products = (
+            Product.objects.select_related("category")
+            .prefetch_related("tags")
+            .with_ratings()
+        )
         query = self.request.GET.get("q", "").strip()
         if query:
             products = products.search(query)
@@ -81,9 +88,19 @@ class ProductDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         user, product = self.request.user, self.object
         own_review = Review.objects.own(user, product)
-        reviews = Review.objects.published().filter(product=product)
+        reviews = (
+            Review.objects.published()
+            .filter(product=product)
+            .order_by("-created_at", "-pk")
+        )
         if own_review:
             reviews = reviews.exclude(pk=own_review.pk)
+        # Paged on ?reviews=N, so the catalog's own ?page=N never collides.
+        # get_page never errors: not a number → page 1; out of range
+        # (0 and negatives too) → the last page.
+        review_page = Paginator(reviews, REVIEWS_PER_PAGE).get_page(
+            self.request.GET.get("reviews", 1)
+        )
         context.update(
             saved=Wishlist.has_saved(user, product),
             rating=Review.objects.summary_for(product),
@@ -91,7 +108,7 @@ class ProductDetailView(DetailView):
             # The author may always delete; Edit shows only while allowed.
             can_edit_review=bool(own_review and own_review.can_edit(user)),
             review_state=Review.objects.visitor_state(user, product, own_review),
-            reviews=reviews,
+            reviews=review_page,
         )
         return context
 

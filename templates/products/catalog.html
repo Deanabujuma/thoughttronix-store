@@ -68,6 +68,7 @@
           <h2 class="card-title">
             <a href="{{ product.get_absolute_url }}" class="link-hover">{{ product.name }}</a>
           </h2>
+          {% include "reviews/partials/_rating_summary.html" with average=product.rating_average count=product.rating_count %}
           <div class="flex flex-wrap gap-2">
             <span class="badge badge-outline">{{ product.category.name }}</span>
             {% if product.is_featured %}

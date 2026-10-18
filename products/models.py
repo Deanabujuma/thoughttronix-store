@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
 from django.db import models
+from django.db.models import Avg, Count, OuterRef, Subquery
+from django.db.models.functions import Coalesce
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.templatetags.static import static
@@ -79,6 +81,37 @@ class ProductQuerySet(models.QuerySet):
         """Simple icontains search over name and description."""
         return self.filter(
             models.Q(name__icontains=text) | models.Q(description__icontains=text)
+        )
+
+    def with_ratings(self):
+        """Annotate ``rating_average`` and ``rating_count`` from published
+        reviews, inside the product query itself — never a query per card.
+
+        Each is a correlated subquery over just that product's reviews, so
+        no join a filter adds (a product with several matching tags, say)
+        can repeat rows and inflate either number. A product with no
+        reviews gets ``None`` and ``0``.
+        """
+        from reviews.models import Review  # reviews imports this module
+
+        published = (
+            Review.objects.published()
+            .filter(product=OuterRef("pk"))
+            .order_by()
+            .values("product")
+        )
+        return self.annotate(
+            rating_average=Subquery(
+                published.annotate(average=Avg("rating")).values("average"),
+                output_field=models.FloatField(),
+            ),
+            rating_count=Coalesce(
+                Subquery(
+                    published.annotate(count=Count("pk")).values("count"),
+                    output_field=models.IntegerField(),
+                ),
+                0,
+            ),
         )
 
 

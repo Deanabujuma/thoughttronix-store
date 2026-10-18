@@ -1,7 +1,7 @@
 {# The product page's #reviews section: the visitor's "Your review" area, #}
 {# then the published reviews. Include with product, rating, own_review, #}
-{# can_edit_review, review_state and reviews (published, the visitor's #}
-{# own left out). #}
+{# can_edit_review, review_state and reviews (one page of the published #}
+{# reviews, the visitor's own left out). #}
 <section id="reviews" class="mt-10" aria-labelledby="reviews-heading">
   <h2 id="reviews-heading" class="text-2xl font-bold">Reviews</h2>
 
@@ -33,6 +33,24 @@
         {% include "reviews/partials/_review.html" %}
       {% endfor %}
     </div>
+
+    {# reviews is one Page of ten. Plain links, no JavaScript; each lands #}
+    {# back on this section. Newer is the page before, Older the one after. #}
+    {% if reviews.has_other_pages %}
+      <nav class="mt-6 flex flex-wrap items-center gap-4" aria-label="Review pages">
+        {% if reviews.has_previous %}
+          <a href="?reviews={{ reviews.previous_page_number }}#reviews" rel="prev"
+             class="btn btn-outline btn-sm">← Newer reviews</a>
+        {% endif %}
+        <span class="text-sm opacity-70">
+          Page {{ reviews.number }} of {{ reviews.paginator.num_pages }}
+        </span>
+        {% if reviews.has_next %}
+          <a href="?reviews={{ reviews.next_page_number }}#reviews" rel="next"
+             class="btn btn-outline btn-sm">Older reviews →</a>
+        {% endif %}
+      </nav>
+    {% endif %}
   {% else %}
     <div class="mt-6 rounded-box bg-base-200 p-6 text-center opacity-70">
       No reviews yet. Customers who've received this product can share their thoughts.
