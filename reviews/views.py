@@ -8,8 +8,9 @@ POST alike.
 from django.contrib import messages
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db import IntegrityError, transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
-from django.views.generic import CreateView
+from django.views.generic import CreateView, DeleteView, UpdateView
 
 from products.models import Product
 
@@ -63,3 +64,68 @@ class ReviewCreateView(UserPassesTestMixin, CreateView):
 
     def get_success_url(self):
         return f"{self.product.get_absolute_url()}#reviews"
+
+
+class OwnReviewMixin(UserPassesTestMixin):
+    """Acts on ``request.user``'s own review of the product in the URL.
+
+    The URL names the product, never the review, so no request can reach
+    anyone else's. In order: anonymous → login; no review of your own →
+    404 (another customer's review of the product is never looked at);
+    your review, but not allowed → 403. Subclasses supply ``allows``.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        self.product = get_object_or_404(Product, slug=kwargs["slug"])
+        self.review = Review.objects.own(request.user, self.product)
+        if request.user.is_authenticated and self.review is None:
+            raise Http404("You have no review of this product.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_object(self, queryset=None):
+        return self.review
+
+    def test_func(self):
+        return self.review is not None and self.allows(self.review)
+
+    def allows(self, review):
+        raise NotImplementedError
+
+    def get_success_url(self):
+        return f"{self.product.get_absolute_url()}#reviews"
+
+
+class ReviewUpdateView(OwnReviewMixin, UpdateView):
+    """Edit your own review, while ``can_edit`` allows it."""
+
+    form_class = ReviewForm
+    template_name = "reviews/review_form.html"
+
+    def allows(self, review):
+        return review.can_edit(self.request.user)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(product=self.product, editing=True, **kwargs)
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, "Your review has been updated.")
+        return response
+
+
+class ReviewDeleteView(OwnReviewMixin, DeleteView):
+    """Delete your own review: GET shows a confirmation and changes
+    nothing; only the POST deletes, through ``delete_by_author``."""
+
+    template_name = "reviews/review_confirm_delete.html"
+
+    def allows(self, review):
+        return review.can_delete(self.request.user)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(product=self.product, **kwargs)
+
+    def form_valid(self, form):
+        self.object.delete_by_author()
+        messages.success(self.request, "Your review has been deleted.")
+        return redirect(self.get_success_url())

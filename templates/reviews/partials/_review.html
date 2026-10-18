@@ -12,5 +12,8 @@
   {% endif %}
   <p class="mt-2 text-sm opacity-60">
     Posted <time datetime="{{ review.created_at|date:'c' }}">{{ review.created_at|date:"M j, Y" }}</time>
+    {% if review.edited_at %}
+      · Edited <time datetime="{{ review.edited_at|date:'c' }}">{{ review.edited_at|date:"M j, Y" }}</time>
+    {% endif %}
   </p>
 </article>

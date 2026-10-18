@@ -88,6 +88,8 @@ class ProductDetailView(DetailView):
             saved=Wishlist.has_saved(user, product),
             rating=Review.objects.summary_for(product),
             own_review=own_review,
+            # The author may always delete; Edit shows only while allowed.
+            can_edit_review=bool(own_review and own_review.can_edit(user)),
             review_state=Review.objects.visitor_state(user, product, own_review),
             reviews=reviews,
         )

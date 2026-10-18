@@ -60,3 +60,58 @@ def test_a_review_of_one_product_does_not_block_another(
     Review.objects.create(user=customer, product=product, rating=4)
 
     assert Review.objects.can_create(customer, unavailable_product) is True
+
+
+# --- Editing and deleting -----------------------------------------------------
+
+
+def test_the_author_may_edit_while_still_eligible(customer, product, delivered_order):
+    review = Review.objects.create(user=customer, product=product, rating=4)
+
+    assert review.can_edit(customer) is True
+    assert review.can_delete(customer) is True
+
+
+@pytest.mark.parametrize(
+    "status", [Status.PLACED, Status.SHIPPED, Status.CANCELLED], ids=str.lower
+)
+def test_an_author_whose_order_changes_may_delete_but_not_edit(
+    customer, product, delivered_order, status
+):
+    review = Review.objects.create(user=customer, product=product, rating=4)
+    delivered_order.status = status
+    delivered_order.save()
+
+    review.refresh_from_db()
+    assert review.status == Review.Status.PUBLISHED  # the review is untouched
+    assert review.can_edit(customer) is False
+    assert review.can_delete(customer) is True
+
+
+def test_a_delivered_order_of_another_product_does_not_keep_edit_rights(
+    customer, product, unavailable_product, order_for
+):
+    review = Review.objects.create(user=customer, product=product, rating=4)
+    order_for(customer, Status.DELIVERED, unavailable_product)
+
+    assert review.can_edit(customer) is False
+
+
+def test_a_superuser_author_may_delete_but_not_edit(customer, product, delivered_order):
+    review = Review.objects.create(user=customer, product=product, rating=4)
+    customer.is_superuser = True
+    customer.save()
+
+    assert review.can_edit(customer) is False
+    assert review.can_delete(customer) is True
+
+
+def test_nobody_else_may_edit_or_delete_a_review(
+    customer, other_customer, staff_user, product, delivered_order, order_for
+):
+    review = Review.objects.create(user=customer, product=product, rating=4)
+    order_for(other_customer, Status.DELIVERED, product)  # eligible, not the author
+
+    for user in [other_customer, staff_user, AnonymousUser()]:
+        assert review.can_edit(user) is False
+        assert review.can_delete(user) is False

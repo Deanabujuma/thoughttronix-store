@@ -1,9 +1,12 @@
+import re
+from datetime import timedelta
 from http import HTTPStatus
 
 import pytest
 from django.contrib.messages import get_messages
 from django.db import IntegrityError
 from django.urls import reverse
+from django.utils import timezone
 
 from orders.models import Order
 
@@ -236,3 +239,334 @@ def test_a_2000_character_comment_is_accepted(
     client.post(create_url(product), {"rating": "4", "comment": "x" * 2000})
 
     assert len(Review.objects.get().comment) == 2000
+
+
+# --- Editing ------------------------------------------------------------------
+
+
+def edit_url(product):
+    return reverse("reviews:edit", kwargs={"slug": product.slug})
+
+
+@pytest.mark.parametrize(
+    ("data", "edited"),
+    [
+        pytest.param({"rating": "4", "comment": "Original"}, False, id="unchanged"),
+        pytest.param(
+            {"rating": "4", "comment": "  Original \n"}, False, id="only whitespace"
+        ),
+        pytest.param({"rating": "2", "comment": "Original"}, True, id="new rating"),
+        pytest.param({"rating": "4", "comment": "Changed"}, True, id="new comment"),
+    ],
+)
+def test_a_review_is_marked_edited_only_when_its_rating_or_comment_changes(
+    client, customer, product, delivered_order, data, edited
+):
+    posted = timezone.now() - timedelta(days=3)
+    review = Review.objects.create(
+        user=customer, product=product, rating=4, comment="Original", created_at=posted
+    )
+    client.force_login(customer)
+    before = timezone.now()
+
+    response = client.post(edit_url(product), data)
+
+    assert response.status_code == HTTPStatus.FOUND
+    review.refresh_from_db()
+    if edited:
+        assert review.edited_at is not None and review.edited_at >= before
+    else:
+        assert review.edited_at is None
+    assert review.created_at == posted
+
+
+def test_an_unchanged_save_keeps_an_earlier_edit_time(
+    client, customer, product, delivered_order
+):
+    edited = timezone.now() - timedelta(days=1)
+    review = Review.objects.create(
+        user=customer,
+        product=product,
+        rating=3,
+        comment="Second thoughts",
+        created_at=edited - timedelta(days=2),
+        edited_at=edited,
+    )
+    client.force_login(customer)
+
+    client.post(edit_url(product), {"rating": "3", "comment": "Second thoughts"})
+
+    review.refresh_from_db()
+    assert review.edited_at == edited
+
+
+# --- Deleting -----------------------------------------------------------------
+
+
+def delete_url(product):
+    return reverse("reviews:delete", kwargs={"slug": product.slug})
+
+
+def test_an_author_promoted_to_staff_can_delete_but_not_edit(
+    client, customer, product, delivered_order
+):
+    review = Review.objects.create(
+        user=customer, product=product, rating=4, comment="Written as a customer"
+    )
+    customer.is_staff = True
+    customer.save()
+    client.force_login(customer)
+
+    confirmation = client.get(delete_url(product))
+    assert confirmation.status_code == HTTPStatus.OK
+    assert Review.objects.filter(pk=review.pk).exists()  # GET deletes nothing
+
+    assert client.get(edit_url(product)).status_code == HTTPStatus.FORBIDDEN
+    refused = client.post(edit_url(product), {"rating": "1", "comment": "Changed"})
+    assert refused.status_code == HTTPStatus.FORBIDDEN
+    review.refresh_from_db()
+    assert (review.rating, review.comment) == (4, "Written as a customer")
+    assert review.status == Review.Status.PUBLISHED
+
+    deleted = client.post(delete_url(product))
+    assert deleted.status_code == HTTPStatus.FOUND
+    assert deleted.url == f"{product.get_absolute_url()}#reviews"
+    assert not Review.objects.filter(pk=review.pk).exists()
+
+
+def test_an_author_whose_order_was_cancelled_may_delete_but_not_edit(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(user=customer, product=product, rating=4, comment="Mine")
+    delivered_order.status = Order.Status.CANCELLED
+    delivered_order.save()
+    client.force_login(customer)
+
+    assert client.get(edit_url(product)).status_code == HTTPStatus.FORBIDDEN
+    refused = client.post(edit_url(product), {"rating": "1", "comment": "Changed"})
+    assert refused.status_code == HTTPStatus.FORBIDDEN
+    assert Review.objects.get().comment == "Mine"
+
+    assert client.post(delete_url(product)).status_code == HTTPStatus.FOUND
+    assert not Review.objects.exists()
+
+
+def test_the_eligible_author_of_a_hidden_review_may_delete_but_not_edit(
+    client, customer, staff_user, product, delivered_order
+):
+    review = Review.objects.create(
+        user=customer,
+        product=product,
+        rating=1,
+        comment="Words staff hid",
+        status=Review.Status.HIDDEN,
+        hidden_by=staff_user,
+        hidden_at=timezone.now(),
+        hidden_reason="Off-topic",
+    )
+    client.force_login(customer)
+
+    assert client.get(edit_url(product)).status_code == HTTPStatus.FORBIDDEN
+    refused = client.post(edit_url(product), {"rating": "5", "comment": "Rewritten"})
+    assert refused.status_code == HTTPStatus.FORBIDDEN
+    review.refresh_from_db()
+    assert (review.rating, review.comment) == (1, "Words staff hid")
+    assert review.status == Review.Status.HIDDEN
+
+    assert client.get(delete_url(product)).status_code == HTTPStatus.OK
+    assert Review.objects.filter(pk=review.pk).exists()
+
+
+# --- No review of yours to act on ---------------------------------------------
+
+
+@pytest.mark.parametrize("url", [edit_url, delete_url], ids=["edit", "delete"])
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_a_visitor_without_a_review_of_the_product_gets_404(
+    client, customer, other_customer, product, delivered_order, order_for, url, method
+):
+    """Even with another customer's review of the same product in place:
+    the URL only ever reaches your own review, so theirs stays untouched."""
+    order_for(other_customer, Order.Status.DELIVERED, product)
+    theirs = Review.objects.create(
+        user=other_customer, product=product, rating=5, comment="Not yours to touch"
+    )
+    client.force_login(customer)
+
+    response = getattr(client, method)(url(product), {"rating": "1", "comment": "X"})
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert "Not yours to touch" not in response.content.decode()
+    theirs.refresh_from_db()
+    assert (theirs.rating, theirs.comment) == (5, "Not yours to touch")
+    assert Review.objects.count() == 1
+
+
+@pytest.mark.parametrize("url", [edit_url, delete_url], ids=["edit", "delete"])
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_anonymous_visitors_to_edit_or_delete_are_sent_to_login(
+    client, customer, product, url, method
+):
+    Review.objects.create(user=customer, product=product, rating=4, comment="Kept")
+
+    response = getattr(client, method)(url(product), {"rating": "1"})
+
+    assert response.status_code == HTTPStatus.FOUND
+    assert response.url.startswith(reverse("accounts:login"))
+    assert f"next={url(product)}" in response.url
+    assert Review.objects.get().comment == "Kept"
+
+
+# --- The edit form ------------------------------------------------------------
+
+
+def test_the_edit_form_starts_from_the_current_review(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(
+        user=customer, product=product, rating=3, comment="Current words"
+    )
+    client.force_login(customer)
+
+    response = client.get(edit_url(product))
+
+    page = response.content.decode()
+    assert response.status_code == HTTPStatus.OK
+    assert "Edit your review of" in page
+    assert "Current words" in page
+    assert response.context["form"]["rating"].value() == 3
+    assert re.search(r'value="3"\s+class="radio"\s+checked', page)
+
+
+def test_a_successful_edit_redirects_with_a_message(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(user=customer, product=product, rating=3, comment="Old")
+    client.force_login(customer)
+
+    response = client.post(edit_url(product), {"rating": "5", "comment": "  New  "})
+
+    assert response.status_code == HTTPStatus.FOUND
+    assert response.url == f"{product.get_absolute_url()}#reviews"
+    assert [str(m) for m in get_messages(response.wsgi_request)] == [
+        "Your review has been updated."
+    ]
+    review = Review.objects.get()
+    assert (review.rating, review.comment) == (5, "New")
+
+
+@pytest.mark.parametrize(
+    ("data", "field"),
+    [
+        ({"comment": "No stars"}, "rating"),
+        ({"rating": "4", "comment": "x" * 2001}, "comment"),
+    ],
+)
+def test_an_invalid_edit_re_displays_and_changes_nothing(
+    client, customer, product, delivered_order, data, field
+):
+    Review.objects.create(user=customer, product=product, rating=3, comment="Old")
+    client.force_login(customer)
+
+    response = client.post(edit_url(product), data)
+
+    assert response.status_code == HTTPStatus.OK
+    assert field in response.context["form"].errors
+    review = Review.objects.get()
+    assert (review.rating, review.comment, review.edited_at) == (3, "Old", None)
+
+
+def test_editing_keeps_the_reviews_place_in_the_list(
+    client, customer, other_customer, product, delivered_order
+):
+    now = timezone.now()
+    mine = Review.objects.create(
+        user=customer, product=product, rating=3, created_at=now - timedelta(days=5)
+    )
+    newer = Review.objects.create(
+        user=other_customer, product=product, rating=4, created_at=now
+    )
+    client.force_login(customer)
+
+    client.post(edit_url(product), {"rating": "5", "comment": "Updated"})
+
+    assert list(Review.objects.all()) == [newer, mine]
+
+
+# --- The delete flow ----------------------------------------------------------
+
+
+def test_the_delete_page_asks_first_and_changes_nothing(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(user=customer, product=product, rating=4)
+    client.force_login(customer)
+
+    response = client.get(delete_url(product))
+
+    page = response.content.decode()
+    assert response.status_code == HTTPStatus.OK
+    assert f"Delete your review of {product.name}?" in page
+    assert 'method="post"' in page
+    assert "csrfmiddlewaretoken" in page
+    assert Review.objects.count() == 1
+
+
+def test_deleting_redirects_with_a_message(client, customer, product, delivered_order):
+    Review.objects.create(user=customer, product=product, rating=4)
+    client.force_login(customer)
+
+    response = client.post(delete_url(product))
+
+    assert response.url == f"{product.get_absolute_url()}#reviews"
+    assert [str(m) for m in get_messages(response.wsgi_request)] == [
+        "Your review has been deleted."
+    ]
+    assert not Review.objects.exists()
+
+
+def test_deleting_leaves_other_reviews_alone(
+    client, customer, other_customer, product, delivered_order
+):
+    Review.objects.create(user=customer, product=product, rating=4)
+    theirs = Review.objects.create(user=other_customer, product=product, rating=2)
+    client.force_login(customer)
+
+    client.post(delete_url(product))
+
+    assert list(Review.objects.all()) == [theirs]
+
+
+def test_after_deleting_an_eligible_customer_may_write_a_fresh_review(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(user=customer, product=product, rating=1, comment="Old take")
+    client.force_login(customer)
+    client.post(delete_url(product))
+
+    form = client.get(create_url(product))
+    response = client.post(create_url(product), {"rating": "5", "comment": "New take"})
+
+    assert form.status_code == HTTPStatus.OK
+    assert response.status_code == HTTPStatus.FOUND
+    review = Review.objects.get()
+    assert (review.rating, review.comment, review.edited_at) == (5, "New take", None)
+
+
+def test_deleting_a_hidden_review_just_deletes_it_for_now(
+    client, customer, staff_user, product, delivered_order
+):
+    """Phase 5 adds the repost restriction; until then nothing else changes."""
+    Review.objects.create(
+        user=customer,
+        product=product,
+        rating=1,
+        status=Review.Status.HIDDEN,
+        hidden_by=staff_user,
+        hidden_at=timezone.now(),
+        hidden_reason="Off-topic",
+    )
+    client.force_login(customer)
+
+    assert client.post(delete_url(product)).status_code == HTTPStatus.FOUND
+    assert not Review.objects.exists()

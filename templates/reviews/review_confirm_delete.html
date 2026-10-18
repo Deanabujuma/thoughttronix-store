@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Delete your review — The ThoughtTronix Store{% endblock %}
+
+{% block content %}
+  <div class="breadcrumbs mb-6 text-sm">
+    <ul>
+      <li><a href="{% url 'products:catalog' %}">Catalog</a></li>
+      <li><a href="{{ product.get_absolute_url }}">{{ product.name }}</a></li>
+      <li>Delete your review</li>
+    </ul>
+  </div>
+
+  <h1 class="text-3xl font-bold">Delete your review of {{ product.name }}?</h1>
+  <p class="mt-4 opacity-80">Your review will be removed for good. This can't be undone.</p>
+
+  {# Only this POST deletes; opening the page changes nothing. #}
+  <form method="post" class="mt-6 flex gap-2">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-error">Delete review</button>
+    <a href="{{ product.get_absolute_url }}#reviews" class="btn btn-ghost">Keep it</a>
+  </form>
+{% endblock %}

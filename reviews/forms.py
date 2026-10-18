@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 
 from .models import Review
 
@@ -29,3 +30,15 @@ class ReviewForm(forms.ModelForm):
         widgets = {
             "comment": forms.Textarea(attrs={"rows": 5, "class": "textarea w-full"})
         }
+
+    def save(self, commit=True):
+        """Save, marking an existing review edited only on a real change.
+
+        ``has_changed`` compares the stored values with the submission as
+        the fields clean it — the rating as a whole number, the comment
+        trimmed — so resaving the same words never counts as an edit.
+        ``created_at`` is never touched, so the review keeps its place.
+        """
+        if self.instance.pk and self.has_changed():
+            self.instance.edited_at = timezone.now()
+        return super().save(commit)

@@ -242,3 +242,119 @@ def test_staff_and_the_admin_are_shown_no_review_controls(
     assert "Sign in to review" not in page
     assert "Only customers who've received" not in page
     assert "Your review" not in page
+
+
+# --- The author's controls (Phase 2) ------------------------------------------
+
+
+def controls(product):
+    return (
+        f'href="{reverse("reviews:edit", kwargs={"slug": product.slug})}"',
+        f'href="{reverse("reviews:delete", kwargs={"slug": product.slug})}"',
+    )
+
+
+def test_an_eligible_author_is_offered_edit_and_delete(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(user=customer, product=product, rating=4)
+    client.force_login(customer)
+    edit, delete = controls(product)
+
+    page = page_for(client, product)
+
+    assert edit in page
+    assert delete in page
+
+
+@pytest.mark.parametrize("change", ["promoted", "order cancelled", "hidden"])
+def test_an_author_who_may_not_edit_is_offered_delete_only(
+    client, customer, staff_user, product, delivered_order, change
+):
+    review = Review.objects.create(user=customer, product=product, rating=4)
+    if change == "promoted":
+        customer.is_staff = True
+        customer.save()
+    elif change == "order cancelled":
+        delivered_order.status = Order.Status.CANCELLED
+        delivered_order.save()
+    else:
+        hide(review, staff_user)
+    client.force_login(customer)
+    edit, delete = controls(product)
+
+    page = page_for(client, product)
+
+    assert "Your review" in page
+    assert edit not in page
+    assert delete in page
+
+
+def test_other_visitors_see_no_edit_or_delete_controls(client, other_customer, product):
+    Review.objects.create(user=reviewer("ana"), product=product, rating=4)
+    edit, delete = controls(product)
+
+    for visit in ["anonymous", "another customer"]:
+        if visit == "another customer":
+            client.force_login(other_customer)
+        page = page_for(client, product)
+        assert edit not in page
+        assert delete not in page
+
+
+# --- "Edited <date>" ----------------------------------------------------------
+
+
+def test_an_edited_review_shows_both_dates(client, customer, product):
+    posted = timezone.now().replace(year=2026, month=3, day=4)
+    edited = timezone.now().replace(year=2026, month=5, day=6)
+    Review.objects.create(
+        user=customer,
+        product=product,
+        rating=4,
+        comment="Edited words",
+        created_at=posted,
+        edited_at=edited,
+    )
+
+    page = page_for(client, product)
+
+    assert "Posted" in page and "Mar 4, 2026" in page
+    assert "Edited" in page and "May 6, 2026" in page
+
+
+def test_an_unedited_review_shows_no_edited_label(client, product):
+    Review.objects.create(user=reviewer("ana"), product=product, rating=4)
+
+    assert "Edited" not in page_for(client, product)
+
+
+def test_the_pinned_review_shows_its_edited_date_too(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(
+        user=customer,
+        product=product,
+        rating=4,
+        edited_at=timezone.now().replace(year=2026, month=5, day=6),
+    )
+    client.force_login(customer)
+
+    page = page_for(client, product)
+
+    assert page.index("Your review") < page.index("May 6, 2026")
+
+
+def test_an_order_status_change_leaves_the_review_public(
+    client, customer, product, delivered_order
+):
+    Review.objects.create(
+        user=customer, product=product, rating=5, comment="Still counts"
+    )
+    delivered_order.status = Order.Status.CANCELLED
+    delivered_order.save()
+
+    page = page_for(client, product)
+
+    assert "Still counts" in page
+    assert 'aria-label="Rated 5.0 out of 5, 1 review"' in page

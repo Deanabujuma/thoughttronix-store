@@ -8,11 +8,11 @@
     <ul>
       <li><a href="{% url 'products:catalog' %}">Catalog</a></li>
       <li><a href="{{ product.get_absolute_url }}">{{ product.name }}</a></li>
-      <li>Write a review</li>
+      <li>{% if editing %}Edit your review{% else %}Write a review{% endif %}</li>
     </ul>
   </div>
 
-  <h1 class="text-3xl font-bold">Review {{ product.name }}</h1>
+  <h1 class="text-3xl font-bold">{% if editing %}Edit your review of{% else %}Review{% endif %} {{ product.name }}</h1>
 
   <form method="post" class="mt-6 max-w-2xl space-y-6">
     {% csrf_token %}
@@ -48,7 +48,7 @@
     {% include "products/partials/_field.html" with field=form.comment %}
 
     <div class="flex gap-2">
-      <button type="submit" class="btn btn-primary">Post review</button>
+      <button type="submit" class="btn btn-primary">{% if editing %}Save changes{% else %}Post review{% endif %}</button>
       <a href="{{ product.get_absolute_url }}#reviews" class="btn btn-ghost">Cancel</a>
     </div>
   </form>

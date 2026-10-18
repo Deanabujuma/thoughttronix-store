@@ -10,4 +10,14 @@ urlpatterns = [
         views.ReviewCreateView.as_view(),
         name="create",
     ),
+    path(
+        "products/<slug:slug>/review/edit/",
+        views.ReviewUpdateView.as_view(),
+        name="edit",
+    ),
+    path(
+        "products/<slug:slug>/review/delete/",
+        views.ReviewDeleteView.as_view(),
+        name="delete",
+    ),
 ]

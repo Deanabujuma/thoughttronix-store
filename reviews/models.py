@@ -4,12 +4,27 @@ from django.core.validators import (
     MaxValueValidator,
     MinValueValidator,
 )
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 
 from orders.models import Order, OrderItem
 from products.models import Product
+
+
+def is_regular_customer(user):
+    """Signed in, and neither staff nor the admin."""
+    return user.is_authenticated and not (user.is_staff or user.is_superuser)
+
+
+def has_received(user, product):
+    """Whether ``user`` has a Delivered order containing this exact
+    product record — matched by FK, never by name or slug."""
+    return OrderItem.objects.filter(
+        product=product,
+        order__user=user,
+        order__status=Order.Status.DELIVERED,
+    ).exists()
 
 
 class ReviewQuerySet(models.QuerySet):
@@ -46,15 +61,11 @@ class ReviewQuerySet(models.QuerySet):
         exact product record (matched by FK, never by name) qualifies,
         and only while they have no review of it yet.
         """
-        if not user.is_authenticated or user.is_staff or user.is_superuser:
+        if not is_regular_customer(user):
             return False
         if self.filter(user=user, product=product).exists():
             return False
-        return OrderItem.objects.filter(
-            product=product,
-            order__user=user,
-            order__status=Order.Status.DELIVERED,
-        ).exists()
+        return has_received(user, product)
 
     def visitor_state(self, user, product, own_review):
         """Which "Your review" area the product page shows this visitor.
@@ -149,3 +160,32 @@ class Review(models.Model):
         # Trim on every save, so a whitespace-only comment is stored empty.
         self.comment = self.comment.strip()
         super().save(*args, **kwargs)
+
+    def can_edit(self, user):
+        """Whether ``user`` may edit this review: its author, while still a
+        regular customer with a Delivered order for this product, and only
+        while the review is published — staff moderation isn't editable.
+
+        Not ``can_create`` — the review itself makes that false.
+        """
+        return (
+            self.status == self.Status.PUBLISHED
+            and self.is_by(user)
+            and is_regular_customer(user)
+            and has_received(user, self.product)
+        )
+
+    def can_delete(self, user):
+        """Whether ``user`` may delete this review: its author, always —
+        even once hidden, after an order changes, or after promotion."""
+        return self.is_by(user)
+
+    def is_by(self, user):
+        """Whether ``user`` is this review's signed-in author."""
+        return user.is_authenticated and self.user_id == user.pk
+
+    def delete_by_author(self):
+        """Delete at the author's request — the only path the customer
+        delete view uses. The Django admin's own delete stays separate."""
+        with transaction.atomic():
+            self.delete()

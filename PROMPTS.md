@@ -28,6 +28,297 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-18 — Product reviews Phase 2: edit and delete your own review
+
+### Prompts
+The same agent session as the Phase 1 entry below, which records prompts
+1–17. Prompt text is verbatim. Prompts 1–3 staged, committed and pushed
+Phase 1; they are recorded here because that entry was already committed.
+Prompt 4 was typed as a slash command; the rest were pasted in. Prompt 8
+was sent twice word for word, so the second copy (prompt 9) is described
+rather than repeated.
+
+1. I approve the proposed 28-file staging list for Product Reviews Phase 1.
+
+   Stage only those exact approved source, template, test, PRD, plan, and
+   PROMPTS.md paths. Do not use git add . or git add -A.
+
+   After staging, show me git diff --cached --name-only, git diff --cached
+   --stat, and git status --short. Verify that the three database files are
+   NOT staged: db.sqlite3, db.sqlite3.before-wishlist-backup, and
+   db.sqlite3.before-reviews-backup. Also confirm no unrelated files or
+   generated CSS assets are staged.
+
+   Do not commit or push yet. Stop for my final review of the staged
+   changes. The proposed eventual commit message is: feat(reviews):
+   implement Phase 1 product reviews and ratings.
+2. I give final approval to commit the 28 staged Product Reviews Phase 1
+   files.
+
+   Use the commit message:
+   feat(reviews): implement Phase 1 product reviews and ratings
+
+   You may include the repository's usual co-author trailer.
+
+   Do not stage any additional files. Do not include db.sqlite3,
+   db.sqlite3.before-wishlist-backup, db.sqlite3.before-reviews-backup, or
+   generated CSS.
+
+   After committing, report the commit hash, git log -1 --oneline, and git
+   status --short. Confirm the three database files remain outside Git.
+
+   Do NOT push to GitHub yet. Stop for my separate push approval. Do not
+   begin Phase 2.
+3. I approve pushing the existing Phase 1 commit 47160b0 to origin/main.
+
+   First confirm that HEAD is still 47160b0 and that the remote branch can
+   be fast-forwarded. Then push only the existing commit to origin/main
+   using a normal git push. Do not force-push, amend the commit, or stage
+   any additional files.
+
+   After pushing, report the remote push result, git status --short, and
+   whether main is synchronized with origin/main.
+
+   Leave db.sqlite3 and both database backups untouched. Do not run seed or
+   start Phase 2 yet.
+4. /implement @prd/product-reviews.md @plans/product-reviews.md implement
+   phase 2
+5. I approve all three proposed Phase 2 TDD behaviors and their order.
+
+   Begin Behavior 1 only. Build the minimal edit-view skeleton and stub
+   eligibility helpers as needed, then write and run the RED test for
+   edited_at changing only when the review rating or comment actually
+   changes, while created_at remains unchanged. Cover both unchanged
+   submissions and real changes.
+
+   Stop after showing the expected RED assertion failure. Do not implement
+   GREEN until I approve it.
+
+   Preserve all existing database records, including my MindSync review,
+   and both backups. Use isolated test databases only. Do not seed, reset,
+   migrate my development database, stage, commit, push, or begin another
+   behavior or phase.
+6. I approve the Phase 2 Behavior 1 RED test and all four cases exactly as
+   written.
+
+   Proceed with GREEN for Behavior 1 only. Set edited_at only when the
+   stored rating or normalized/trimmed comment genuinely changes. Preserve
+   created_at and existing review ordering. Ensure a review previously
+   edited does not receive a new edited_at timestamp for an unchanged
+   submission.
+
+   Run the Behavior 1 tests, relevant regression tests, the full suite, and
+   Ruff lint/format checks. Report exact results and stop for my GREEN
+   approval before starting Behavior 2.
+
+   Do not implement Behavior 2 or 3 yet. Do not seed, migrate, reset,
+   modify my development database, stage, commit, push, or touch either
+   database backup.
+7. I approve Phase 2 Behavior 1 GREEN. All 639 tests pass, and Ruff is
+   clean.
+
+   Proceed with Behavior 2 RED only: an original review author who is
+   subsequently promoted to staff must still be able to delete their own
+   review, but must not be allowed to edit it.
+
+   Build the minimal delete-route and delete-view skeleton normally,
+   keeping deletion behind a GET confirmation page and POST-only
+   destructive action. Then write and run the RED test against both edit
+   and delete endpoints. Confirm the staff author receives 403 when
+   attempting to edit, but can access their own delete confirmation and
+   delete via POST. Include an assertion that GET does not delete the
+   review.
+
+   Keep the distinction between can_edit and can_delete, and preserve the
+   signed-in authorship rule. Stop after the expected RED assertion
+   failure, before implementing GREEN.
+
+   Do not begin Behavior 3, seed, reset, migrate or change db.sqlite3,
+   touch either backup, stage, commit, or push.
+8. I approve the Phase 2 Behavior 2 RED test exactly as written.
+
+   Proceed with GREEN for Behavior 2 only.
+
+   Implement Review.can_edit(user) so editing requires all three
+   conditions: (1) the user is the review's original author, (2) the user
+   is currently a regular non-staff, non-superuser customer, and (3) the
+   user currently has a Delivered OrderItem for that exact product. Do not
+   use can_create for this check, because an existing review intentionally
+   makes can_create false.
+
+   Keep Review.can_delete(user) based solely on authenticated authorship,
+   even if the author becomes staff or loses Delivered-order eligibility.
+   Preserve the GET confirmation and POST-only deletion rules.
+
+   Run the approved Behavior 2 test and add focused normal regression tests
+   for loss of Delivered eligibility and ownership as appropriate. Run the
+   reviews tests, full regression suite, Ruff lint and formatting. Report
+   exact results and STOP for my GREEN approval before Behavior 3.
+
+   Do not modify my development database or backups, migrate, seed, stage,
+   commit, push, or begin Phase 3.
+9. *(Prompt 8 sent again, word for word, while the full suite was still
+   running.)*
+10. I approve Phase 2 Behavior 2 GREEN. All 648 tests pass and Ruff is
+    clean.
+
+    Before Behavior 3, add the one missing PRD safeguard as normal
+    regression work: Review.can_edit must also require status ==
+    Review.Status.PUBLISHED. Add a focused test showing an eligible author
+    of a hidden review cannot edit it but can still access their delete
+    confirmation. Do not implement ReviewRestriction yet; that belongs to
+    Phase 5. Run relevant tests.
+
+    Then proceed with Behavior 3 RED only: a signed-in user who does not own
+    a review for the requested product must receive HTTP 404 on both edit
+    and delete endpoints. Ensure the test covers the case where another
+    user's review exists for the product, without revealing or modifying
+    that review. Build only necessary skeleton changes and demonstrate the
+    expected RED assertion failure.
+
+    Stop for my RED approval before implementing GREEN for Behavior 3. Do
+    not begin remaining normal Phase 2 work yet.
+
+    Do not migrate, seed, reset or modify my development database or either
+    backup. Do not stage, commit, or push.
+11. I approve the Phase 2 Behavior 3 RED test, including all four GET/POST
+    cases, exactly as written.
+
+    Proceed with GREEN for Behavior 3 only.
+
+    Make both edit and delete endpoints return HTTP 404 when an
+    authenticated visitor has no review of their own for the requested
+    product, even if another customer has reviewed it. Preserve the
+    existing HTTP 403 rule when the visitor owns a review but is not
+    authorized to edit it. Anonymous visitors must still be redirected to
+    login rather than receiving 404.
+
+    Ensure the other customer's review and comment are never exposed or
+    modified. Keep delete confirmation GET read-only and deletion POST-only.
+
+    Run all four Behavior 3 cases, relevant authorization regressions, the
+    complete test suite, and Ruff lint/format checks. Report exact results
+    and stop for my GREEN approval before continuing the remaining Phase 2
+    work.
+
+    Do not modify my development database or backups, migrate, seed, stage,
+    commit, push, or start Phase 3.
+12. I approve Phase 2 Behavior 3 GREEN. All 657 tests pass, and Ruff is
+    clean. All three Phase 2 TDD cycles are complete.
+
+    Proceed with the remaining normal Phase 2 work according to
+    prd/product-reviews.md and plans/product-reviews.md:
+    - Add Edit and Delete controls in the pinned Your review section. Show
+    Edit only when Review.can_edit allows it; allow Delete for the author
+    even when editing is forbidden.
+    - Display the Edited date only when edited_at is set, preserving the
+    original posted date.
+    - Complete and test the delete confirmation and POST-only deletion flow.
+    - Test that deleting a published review allows the customer to write a
+    fresh review if still eligible.
+    - Add the outstanding order-status regression and any necessary
+    authorization, template, date, and form tests.
+
+    Important: Phase 5 will handle restrictions for hidden-review deletion.
+    Do not implement that branch or ReviewRestriction now.
+
+    Run the full regression suite, Ruff lint, Ruff format, Django system and
+    migration checks. Fix any failures.
+
+    Then STOP and give me precise Phase 2 browser verification instructions
+    using my existing development database and customer account. Do not
+    modify or seed my database directly, apply migrations, stage, commit,
+    push, or begin Phase 3. Preserve both database backups and the existing
+    MindSync review.
+13. Phase 2 browser verification is complete. I confirmed editing a
+    SyncRest review, unchanged saves not setting Edited, real changes
+    setting Edited, canceling deletion preserving the review, POST deletion
+    working, and successfully creating a new review after deletion. Both
+    edit and delete of a nonexistent own DreamWeaver review return 404.
+    Anonymous edit and delete URLs redirect to login. My original MindSync
+    review was preserved.
+
+    Please complete the Phase 2 PROMPTS.md entry required by /implement,
+    documenting the TDD cycles, decisions, verification and any deviations.
+
+    Then run final full pytest, Ruff lint/format, Django system checks, and
+    makemigrations --check --dry-run. Show git status --short and the exact
+    proposed Phase 2 files to stage, including a concise diff/stat.
+
+    Do not stage, commit, or push yet. Do not modify, seed, reset, or
+    migrate my db.sqlite3, and do not touch
+    db.sqlite3.before-wishlist-backup or db.sqlite3.before-reviews-backup.
+    Exclude all three database files and generated CSS from the proposed
+    staging list.
+
+    Stop for my approval of the staging list. Do not begin Phase 3.
+
+### Summary
+- **Outcome:** an author can edit their own review while still eligible,
+  and can always delete it after a confirmation step.
+  - **Phase 1 commit (prompts 1–3):** the 28 reviewed files were staged by
+    path. The commit is `47160b0`, pushed to `origin/main` as a
+    fast-forward from `f067450`. The agent corrected one point: the
+    developer asked it to confirm all three database files "remain outside
+    Git", but `db.sqlite3` has been tracked since before this session. It
+    was left out of the commit, and its local changes stay uncommitted.
+  - **TDD (prompts 5–11):** three approved behaviors, each RED on an
+    assertion, then GREEN with the full suite run:
+    1. **`edited_at` only on a real change.** Four cases: unchanged, only
+       whitespace, a new rating, a new comment. `created_at` never moves.
+       `ReviewForm.save` sets `edited_at` only when `has_changed()`
+       compares the stored values with the cleaned submission and finds
+       a difference, and only for an existing review.
+    2. **A promoted author can delete but not edit.** `can_edit` needs the
+       signed-in author, a regular customer, and a Delivered order for this
+       exact product (`is_by`, `is_regular_customer`, `has_received`).
+       `can_create` now shares those two helpers. `can_delete` is
+       authorship only.
+    3. **404 with no review of your own** on edit and delete, GET and POST,
+       even when another customer has reviewed the product. Their review is
+       never shown or changed. A shared `OwnReviewMixin` gives a fixed
+       order: anonymous → login, no review of yours → 404, your review but
+       not allowed → 403.
+  - **Normal Phase 2 work (prompts 10 and 12):**
+    - `can_edit` also requires a published review, the PRD rule the agent
+      flagged at Behavior 2's GREEN.
+    - Edit and Delete controls in "Your review": Edit only while allowed,
+      Delete always.
+    - "Posted … · Edited …" on the pinned and public reviews.
+    - The delete confirmation page (POST form with CSRF, **Keep it**
+      link), and `delete_by_author()` for published reviews.
+    - Tests: losing Delivered status, a superuser author, other users,
+      anonymous edit and delete, the hidden-author safeguard, the edit
+      form's starting values and errors, list position, the delete flow, a
+      fresh review after deleting, and an order-status change leaving the
+      review public.
+    - 42 new tests; the suite went from 634 to 676.
+  - **Browser verification (prompt 13):** done by the developer as
+    `customer` on a temporary SyncRest review, plus the DreamWeaver 404s
+    and the anonymous redirects. The MindSync review was preserved.
+- **Deviations:**
+  - The published-status rule for editing was added before Behavior 3 at
+    the developer's request (prompt 10). The Behavior 2 instruction had
+    listed only three conditions.
+  - Deleting a hidden review still just deletes it. The repost restriction
+    is left for Phase 5, as instructed, and a test records that.
+  - The 403 case for an author who can't edit was not checked in the
+    browser, because reaching it would mean changing the developer's data.
+    View and page tests cover it.
+- **Sideways:**
+  - **A stray block in `forms.py`.** The first Behavior 1 edit left a
+    meaningless `_unused = {…}` block at the bottom of `ReviewForm`. The
+    agent saw it, removed it before running any test, and disclosed it.
+  - **A duplicate prompt.** Prompt 8 arrived a second time while the full
+    suite was still running. The agent reported the finished work instead
+    of redoing it.
+  - **A failed check command.** A combined Ruff, Django and CSS-class
+    check failed to parse, because PowerShell broke on the embedded bash
+    quoting; none of it ran. It was rerun split into PowerShell and Bash
+    calls.
+  - **A brittle assertion.** A test matched the checked radio's exact
+    template whitespace. It was loosened to a regex before the final run.
+
 ## 2026-10-18 — Product reviews: PRD finalized, six-phase plan, Phase 1 (write and display reviews)
 
 ### Prompts
