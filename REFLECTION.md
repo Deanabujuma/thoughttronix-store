@@ -1,5 +1,48 @@
 # Reflection
 
+
+---
+
+## Product Reviews
+
+### Question 1 — Test-Driven Development (TDD)
+
+One behavior I used test-driven development for was updating product reviews without refreshing the entire page. I chose this because I wanted to make sure creating, editing, and deleting reviews would work correctly with HTMX before implementing the feature.
+
+In `reviews/test_htmx.py`, the test `test_a_successful_inline_action_swaps_the_reviews_section_and_summary` checks that these actions return the updated reviews section and rating summary. Initially, all three cases failed because Django returned a `302` redirect instead of the expected `200` response. After implementing the HTMX response in `ReviewActionMixin.finished()` in `reviews/views.py`, the tests passed.
+
+This showed me why TDD is useful. Instead of implementing something and assuming it worked, I had a specific test that identified the problem and confirmed when the behavior was correct.
+
+### Question 2 — Authorization and Deleting Reviews
+
+When a customer attempts to delete a review, Django first checks whether that review belongs to the currently logged-in user.
+
+The delete URL is defined in `reviews/urls.py`, and the request is handled by `ReviewDeleteView` in `reviews/views.py`. The `OwnReviewMixin` uses `Review.objects.own(request.user, self.product)` to find a review associated with both the current user and the product. If a signed-in user does not have a review for that product, Django returns a `404` response; an anonymous visitor is sent to the login page instead.
+
+The `can_delete()` method in `reviews/models.py` also checks that the user is the review's author. If the request is authorized and the customer confirms deletion, `delete_by_author()` removes the review. If the review is currently hidden by staff moderation when it is deleted, the method also creates a restriction to prevent the customer from bypassing moderation by deleting and reposting it.
+
+I think this design is important because customers should have control over their own reviews without being able to modify or delete another person's review.
+
+### Question 3 — HTMX and hx-post
+
+One place I used HTMX is the review form in `templates/reviews/partials/_review_form.html`. The form uses `hx-post="{{ request.path }}"` to submit its information to the existing Django review endpoint without reloading the entire page.
+
+When a customer clicks Edit, HTMX loads the form directly into the product's reviews section. After the customer changes their rating or comment and saves, Django processes the request and returns updated HTML. The `ReviewActionMixin.finished()` method sends back the updated reviews section and rating summary, allowing HTMX to replace those parts of the page.
+
+I tested this myself in the browser by editing my SyncRest review from four stars to five stars. The review and product rating updated without navigating to another page. I also verified that Cancel restored the original review display.
+
+I liked using HTMX here because it made the website feel more interactive while still allowing Django to handle the forms, validation, and authorization.
+
+### Question 4 — Design Decision and Tradeoffs
+
+During my `/grill-me` interview, I had to decide how customers would create, edit, and delete product reviews. The main options were separate Django pages, inline forms without HTMX, or inline forms using HTMX.
+
+I originally chose separate Django pages because they were simpler to implement using Django's built-in class-based views. They also made it easier to handle form validation, errors, and permissions without adding more moving parts. The disadvantage was that customers had to navigate to another page instead of making changes directly on the product page.
+
+Later, while reviewing the assignment requirements, I realized the review actions needed to work with HTMX. I added inline functionality in Phase 7 while keeping the original Django pages as a fallback when JavaScript is unavailable.
+
+This decision required additional templates, response handling, and tests, but it improved the user experience without removing the functionality I had already built. It taught me that software design involves balancing simplicity, maintainability, and user experience, and that an earlier design decision sometimes needs to change when new requirements become clear.
+
 ## Account Security Center
 
 ### Question 1 — Review One Phase

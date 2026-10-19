@@ -430,7 +430,7 @@ The developer confirmed these four defaults on 2026-10-18. Each one is already r
   - (C) an inline form submitted with HTMX.
 
   It recommended A. The developer chose A: *"Separate Django pages for writing, editing, and deleting product reviews, using standard class-based views and normal form submissions."* Phases 1–6 built exactly that, and no review template uses HTMX.
-- **The correction.** A final audit confirmed that creating, editing and deleting don't use `hx-post`. The developer decided they should work inline with HTMX, like the store's other customer actions (cart, wishlist and discount code).
+- **The correction.** A final audit confirmed that creating, editing and deleting don't use `hx-post`. The developer decided, based on the assignment's requirements, that they should work inline with HTMX.
 - **What stays.** The A pages aren't removed. They remain the no-JavaScript path, unchanged. HTMX is added on top, on the same URLs. This amends Q13; it doesn't erase it.
 
 ### Decisions
