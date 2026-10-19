@@ -59,11 +59,14 @@ class ReviewQuerySet(models.QuerySet):
 
         Only a regular customer with a Delivered order containing this
         exact product record (matched by FK, never by name) qualifies,
-        and only while they have no review of it yet.
+        and only while they have no review of it yet and no restriction
+        on it.
         """
         if not is_regular_customer(user):
             return False
         if self.filter(user=user, product=product).exists():
+            return False
+        if ReviewRestriction.applies(user, product):
             return False
         return has_received(user, product)
 
@@ -71,9 +74,10 @@ class ReviewQuerySet(models.QuerySet):
         """Which "Your review" area the product page shows this visitor.
 
         One of ``"anonymous"``, ``"author"``, ``"staff"`` (shown nothing),
-        ``"eligible"`` or ``"ineligible"``. It asks ``can_create`` — the
-        same rule the create view enforces — so the page never offers
-        what the server would refuse.
+        ``"restricted"``, ``"eligible"`` or ``"ineligible"``. It asks
+        ``can_create`` — the same rule the create view enforces — so the
+        page never offers what the server would refuse. A restriction is
+        the more specific reason, so it wins over "ineligible".
         """
         if not user.is_authenticated:
             return "anonymous"
@@ -81,6 +85,8 @@ class ReviewQuerySet(models.QuerySet):
             return "author"
         if user.is_staff or user.is_superuser:
             return "staff"
+        if ReviewRestriction.applies(user, product):
+            return "restricted"
         if self.can_create(user, product):
             return "eligible"
         return "ineligible"
@@ -225,6 +231,79 @@ class Review(models.Model):
 
     def delete_by_author(self):
         """Delete at the author's request — the only path the customer
-        delete view uses. The Django admin's own delete stays separate."""
+        delete view uses. The Django admin's own delete stays separate.
+
+        Deleting a hidden review leaves a ``ReviewRestriction`` behind,
+        copying staff's record of the hide (never the rating or comment),
+        so the author can't simply post again. One restriction per
+        customer and product: an existing one is updated, not duplicated.
+        The restriction and the deletion happen together or not at all.
+        """
         with transaction.atomic():
+            if self.status == self.Status.HIDDEN:
+                ReviewRestriction.objects.update_or_create(
+                    user_id=self.user_id,
+                    product_id=self.product_id,
+                    defaults={
+                        "hidden_reason": self.hidden_reason,
+                        "hidden_by_id": self.hidden_by_id,
+                        "hidden_at": self.hidden_at,
+                        "created_at": timezone.now(),
+                    },
+                )
             self.delete()
+
+
+class ReviewRestriction(models.Model):
+    """Blocks one customer from reviewing one product again.
+
+    Left behind when an author deletes a hidden review, so moderation
+    can't be undone by deleting and reposting. It keeps staff's record of
+    the hide — never the review's rating or comment. A row existing means
+    the restriction is active; clearing it deletes the row.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="review_restrictions",
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="review_restrictions"
+    )
+    hidden_reason = models.CharField(max_length=200)
+    hidden_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    hidden_at = models.DateTimeField()
+    # When the author deleted the hidden review.
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "product"], name="unique_restriction_user_product"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} may not review {self.product}"
+
+    @classmethod
+    def applies(cls, user, product):
+        """Whether ``user`` is restricted from reviewing ``product``."""
+        return cls.objects.filter(user=user, product=product).exists()
+
+    def clear(self):
+        """Lift this restriction, so the customer may review again.
+
+        Returns whether it was cleared now. Only this one row is deleted,
+        in a single statement, so two staff clearing at once can't
+        conflict — the second simply finds nothing left.
+        """
+        return ReviewRestriction.objects.filter(pk=self.pk).delete()[0] > 0

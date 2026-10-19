@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -306,8 +306,10 @@ def test_other_visitors_see_no_edit_or_delete_controls(client, other_customer, p
 
 
 def test_an_edited_review_shows_both_dates(client, customer, product):
-    posted = timezone.now().replace(year=2026, month=3, day=4)
-    edited = timezone.now().replace(year=2026, month=5, day=6)
+    # Noon UTC: the same calendar date in the store's Chicago time zone,
+    # whatever time of day the suite runs.
+    posted = datetime(2026, 3, 4, 12, tzinfo=UTC)
+    edited = datetime(2026, 5, 6, 12, tzinfo=UTC)
     Review.objects.create(
         user=customer,
         product=product,
@@ -336,7 +338,7 @@ def test_the_pinned_review_shows_its_edited_date_too(
         user=customer,
         product=product,
         rating=4,
-        edited_at=timezone.now().replace(year=2026, month=5, day=6),
+        edited_at=datetime(2026, 5, 6, 12, tzinfo=UTC),  # noon UTC: see above
     )
     client.force_login(customer)
 

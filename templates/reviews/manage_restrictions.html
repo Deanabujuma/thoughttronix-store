@@ -1,0 +1,78 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Review restrictions — Back office{% endblock %}
+
+{% block backoffice %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+    <h2 class="text-xl font-semibold">
+      {{ page_obj.paginator.count }} active restriction{{ page_obj.paginator.count|pluralize }}
+    </h2>
+    <a href="{% url 'reviews:manage_reviews' %}" class="btn btn-ghost btn-sm">← All reviews</a>
+  </div>
+  <p class="mb-6 text-sm opacity-70">
+    A customer who deletes a review staff hid can't review that product again
+    until the restriction is cleared.
+  </p>
+
+  {% if restrictions %}
+    <div class="overflow-x-auto rounded-box bg-base-100 shadow-md">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Product</th>
+            <th>Reason</th>
+            <th>Hidden by</th>
+            <th>Hidden on</th>
+            <th>Restricted on</th>
+            <th><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for restriction in restrictions %}
+            <tr>
+              <td>{{ restriction.user.username }}</td>
+              <td>
+                <a href="{{ restriction.product.get_absolute_url }}" class="link-hover">{{ restriction.product.name }}</a>
+              </td>
+              <td>{{ restriction.hidden_reason }}</td>
+              <td>{% if restriction.hidden_by %}{{ restriction.hidden_by.username }}{% else %}Former staff member{% endif %}</td>
+              <td>{{ restriction.hidden_at|date:"M j, Y" }}</td>
+              <td>{{ restriction.created_at|date:"M j, Y" }}</td>
+              <td>
+                <a href="{% url 'reviews:manage_restriction_clear' restriction.pk %}"
+                   class="btn btn-ghost btn-sm">Clear restriction</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if is_paginated %}
+      <div class="mt-8 flex justify-center">
+        <div class="join">
+          {% if page_obj.has_previous %}
+            <a href="{% querystring page=page_obj.previous_page_number %}" class="btn join-item">«</a>
+          {% else %}
+            <button class="btn join-item btn-disabled">«</button>
+          {% endif %}
+          <button class="btn join-item pointer-events-none">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+          </button>
+          {% if page_obj.has_next %}
+            <a href="{% querystring page=page_obj.next_page_number %}" class="btn join-item">»</a>
+          {% else %}
+            <button class="btn join-item btn-disabled">»</button>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="py-16 text-center">
+      <p class="text-5xl">🔓</p>
+      <p class="mt-4 text-xl font-semibold">No active restrictions</p>
+      <p class="mt-2 opacity-70">Everyone who has received a product may review it.</p>
+    </div>
+  {% endif %}
+{% endblock %}

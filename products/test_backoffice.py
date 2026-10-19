@@ -5,6 +5,9 @@ from http import HTTPStatus
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
+
+from reviews.models import Review
 
 from .models import Category, Product, Tag
 
@@ -232,3 +235,41 @@ def test_manage_catalog_lists_categories_and_tags(client, staff_user, product, t
 
     assert product.category.name in page
     assert tag.name in page
+
+
+# --- The delete warning for reviewed products -------------------------------------
+
+
+def test_the_delete_page_warns_how_many_reviews_go_with_the_product(
+    client, staff_user, customer, other_customer, product
+):
+    Review.objects.create(user=customer, product=product, rating=4)
+    Review.objects.create(  # hidden reviews are deleted too, so they count
+        user=other_customer,
+        product=product,
+        rating=1,
+        status=Review.Status.HIDDEN,
+        hidden_by=staff_user,
+        hidden_at=timezone.now(),
+        hidden_reason="Off-topic",
+    )
+    client.force_login(staff_user)
+
+    page = client.get(
+        reverse("products:manage_product_delete", kwargs={"pk": product.pk})
+    ).content.decode()
+
+    assert "This will also permanently delete 2 reviews." in page
+    assert "This can't be undone in the store." in page
+
+
+def test_the_delete_page_shows_no_review_warning_without_reviews(
+    client, staff_user, product
+):
+    client.force_login(staff_user)
+
+    page = client.get(
+        reverse("products:manage_product_delete", kwargs={"pk": product.pk})
+    ).content.decode()
+
+    assert "permanently delete" not in page

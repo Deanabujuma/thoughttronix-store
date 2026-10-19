@@ -5,9 +5,12 @@
 
 {% block backoffice %}
   <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
-    <h2 class="text-xl font-semibold">
-      {{ page_obj.paginator.count }} review{{ page_obj.paginator.count|pluralize }}
-    </h2>
+    <div class="flex flex-wrap items-center gap-4">
+      <h2 class="text-xl font-semibold">
+        {{ page_obj.paginator.count }} review{{ page_obj.paginator.count|pluralize }}
+      </h2>
+      <a href="{% url 'reviews:manage_restrictions' %}" class="btn btn-outline btn-sm">Restrictions</a>
+    </div>
     <div class="flex flex-wrap items-center gap-2 text-sm">
       <span class="opacity-60">Status:</span>
       <a href="{% querystring status=None page=None %}"

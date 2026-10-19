@@ -11,7 +11,7 @@ from django.utils import timezone
 from orders.models import Order
 
 from .forms import ReviewForm
-from .models import Review
+from .models import Review, ReviewRestriction
 
 
 def create_url(product):
@@ -553,10 +553,10 @@ def test_after_deleting_an_eligible_customer_may_write_a_fresh_review(
     assert (review.rating, review.comment, review.edited_at) == (5, "New take", None)
 
 
-def test_deleting_a_hidden_review_just_deletes_it_for_now(
+def test_deleting_a_hidden_review_deletes_it_and_leaves_a_restriction(
     client, customer, staff_user, product, delivered_order
 ):
-    """Phase 5 adds the repost restriction; until then nothing else changes."""
+    """The customer flow end to end; ``test_restrictions.py`` has the detail."""
     Review.objects.create(
         user=customer,
         product=product,
@@ -570,3 +570,4 @@ def test_deleting_a_hidden_review_just_deletes_it_for_now(
 
     assert client.post(delete_url(product)).status_code == HTTPStatus.FOUND
     assert not Review.objects.exists()
+    assert ReviewRestriction.objects.filter(user=customer, product=product).exists()

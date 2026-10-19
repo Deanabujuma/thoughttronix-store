@@ -27,6 +27,8 @@
       </div>
     {% elif review_state == "eligible" %}
       <a href="{% url 'reviews:create' product.slug %}" class="btn btn-primary btn-sm">Write a review</a>
+    {% elif review_state == "restricted" %}
+      <p class="opacity-70">You cannot currently review this product. If you believe this is a mistake, please contact our team.</p>
     {% elif review_state == "ineligible" %}
       <p class="opacity-70">Only customers who've received this product can review it.</p>
     {% endif %}

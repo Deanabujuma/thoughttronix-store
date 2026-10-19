@@ -28,6 +28,329 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-18 — Product reviews Phase 5: restrictions after deleting a hidden review
+
+### Prompts
+The same agent session as the Phase 4 entry below, which records its own
+prompts 1–12. Prompt text is verbatim, typos and missing spaces included.
+Prompts 1–5 staged, committed and pushed Phase 4; they are recorded here
+because that entry was already committed. Prompts 3, 4 and 7 repeated
+earlier text and are described rather than reproduced. Prompts 9, 10, 12
+and 14–18, and the short addition in prompt 7, were typed directly; the
+rest were pasted in. `/implement` never ran as a command, so the agent
+followed it and `/tdd` directly.
+
+1. I approve the proposed 12-file staging list for Product Reviews Phase 4.
+
+   Stage ONLY these exact paths:
+   PROMPTS.md
+   reviews/forms.py
+   reviews/models.py
+   reviews/urls.py
+   reviews/views.py
+   templates/backoffice/base.html
+   templates/reviews/partials/_reviews_section.html
+   templates/reviews/manage_reviews.html
+   templates/reviews/manage_review_detail.html
+   templates/reviews/partials/_moderation_status.html
+   reviews/test_backoffice.py
+   reviews/test_models.py
+
+   Do not use git add . or git add -A.
+
+   After staging, show git diff --cached --name-only, git diff --cached
+   --stat, and git status --short. Verify there are exactly 12 staged
+   files, with no database, backup, generated CSS, or unrelated files
+   included.
+
+   Do not commit or push yet. Stop for my final review of the staged
+   changes.
+
+   Proposed future commit message: feat(reviews): add Phase 4 staff
+   moderation.
+2. I give final approval to commit the 12 staged Product Reviews Phase 4
+   files.
+
+   Use this exact commit subject:
+   feat(reviews): add Phase 4 staff moderation
+
+   You may include the repository's usual co-author trailer.
+
+   Do not stage additional files, amend previous commits, or include
+   db.sqlite3, db.sqlite3.before-reviews-backup,
+   db.sqlite3.before-wishlist-backup, or generated CSS.
+
+   After committing, report the full commit hash, git log -1 --oneline,
+   and git status --short. Confirm exactly the 12 approved files were
+   committed, and all database files remain excluded.
+
+   Do NOT push to GitHub yet. Stop for my separate push approval. Do not
+   begin Phase 5.
+3. *(Prompt 2 sent again, word for word, after the commit existed.)*
+4. *(A copy of prompts 2 and 3 and the agent's two replies, pasted back
+   with no new instruction.)*
+5. That second instruction was intended as a verification checkpoint to
+   confirm the operation was idempotent. Since the Phase 4 commit already
+   existed, I wanted to ensure that repeating the instruction wouldn't
+   create a duplicate commit, amend the existing one, or stage additional
+   files.
+
+   The correct behavior was to recognize that the requested state had
+   already been achieved, verify the commit hash and working tree, and
+   stop without making further changes.
+
+   That check passed. We can now proceed with the separately approved
+   push.
+6. Phase 4 was successfully pushed to origin/main at commit
+   340bd51c988f46d4df5d91ae77539554ca957aa9. Begin ONLY Phase 5 of the
+   approved Product Reviews PRD and plan: hidden review restrictions.
+
+   Read prd/product-reviews.md, plans/product-reviews.md,
+   .claude/skills/implement/SKILL.md, and .claude/skills/tdd/SKILL.md
+   before proposing work.
+
+   Before writing any implementation or tests, propose up to three Phase 5
+   TDD behaviors for my approval. Cover: (1) deleting a HIDDEN review
+   creates or preserves a restriction for that exact customer/product and
+   prevents posting again, without restricting other products; (2)
+   deleting a PUBLISHED review does not restrict re-reviewing when
+   eligible; and (3) staff-only, CSRF-protected restriction clearing via a
+   GET confirmation and POST action, restoring eligibility appropriately.
+   Include atomicity, repeated delete/clear handling, authorization, and
+   the UI effects required by the PRD.
+
+   Identify any open design decisions and explain the RED/GREEN order.
+   STOP for my approval before writing code.
+
+   The database schema may require a migration. Do not create or apply
+   migrations yet. Before any migration touches the development database,
+   stop to confirm the existing backup and obtain explicit approval. Never
+   overwrite either backup.
+
+   Preserve db.sqlite3 and both backups, including the real published
+   MindSync and SyncRest reviews. Use pytest's isolated test database for
+   fixtures. Do not seed, reset, stage, commit, push, or begin Phase 6.
+7. *(Prompt 6 arrived twice more: once while the agent was still working
+   on it, and once with this short version added.)* Begin Phase 5: Hidden
+   Review Restrictions.Review the approved PRD, plan, and TDD
+   workflow. Propose up to three behaviors covering hidden-review deletion
+   restrictions, normal published-review deletion, and staff clearing
+   restrictions.Stop for my approval before writing code.Preserve the
+   existing database and backups. Do not create or apply migrations yet,
+   or stage, commit, push, or begin Phase 6.
+8. I approve the three Phase 5 TDD behaviors, their order (1 → 2 → 3), and
+   the recommended design decisions described in your proposal.
+
+   I explicitly authorize creating
+   reviews/migrations/0002_reviewrestriction.py for pytest's isolated test
+   database, but NOT applying it to db.sqlite3. Generate and inspect the
+   migration using the isolated/in-memory configuration. Do not run
+   migrate against my development database.
+
+   Proceed with Phase 5 Behavior 1 RED ONLY: deleting a hidden review
+   creates or updates exactly one restriction for that customer/product in
+   the same transaction, preserving the moderation reason, moderator and
+   timestamp but not the review rating/comment. Deleting a published review
+   must not create a restriction and must continue to permit an otherwise
+   eligible customer to review again.
+
+   Create the minimum ReviewRestriction model and migration skeleton
+   required for an assertion-based RED test. Add focused isolated pytest
+   cases for the hidden and published deletion paths, the
+   one-restriction-per-user/product uniqueness rule, and the expected
+   atomicity/idempotence behavior. Demonstrate a genuine failing assertion
+   rather than an import, migration, or missing-table error. STOP for my
+   RED approval before implementing GREEN or starting Behavior 2.
+
+   Before any future migration is applied to db.sqlite3, stop and request
+   approval to create and verify a NEW backup named
+   db.sqlite3.before-restrictions-backup. Never overwrite either existing
+   backup.
+
+   Preserve db.sqlite3, both existing backups, and my published MindSync
+   and SyncRest reviews. Do not seed, reset, stage, commit, push, or begin
+   Phase 6.
+9. I approve Behavior 1 RED: three expected assertion failures and three
+   passing cases.Proceed with GREEN for Behavior 1 only.Implement the
+   hidden-review deletion and restriction creation as one atomic operation.
+   Preserve the staff moderation record, prevent duplicate restrictions,
+   and keep published-review deletion unchanged.Run the targeted tests,
+   rollback regression, full test suite, and Ruff.STOP for GREEN approval
+   before Behavior 2. Do not apply the migration to my development
+   database, or stage, commit, or push anything.
+10. I approve Behavior 1 GREEN. All 749 tests pass.Proceed with Behavior 2
+    RED only.Test that a restriction blocks review creation for the
+    specific product on both GET and POST, and displays the approved
+    restriction message instead of Write a review.Verify other eligible
+    products are unaffected and forbidden requests cannot create
+    reviews.Show the expected failing assertions, then STOP before
+    GREEN.Keep the migration off my development database and preserve all
+    existing reviews and backups.
+11. I approve Phase 5 Behavior 2 RED.Proceed with GREEN for Behavior 2
+    only.- Block restricted customers from both GET and POST review
+    creation with HTTP 403.
+    - Display the approved restriction message instead of Write a review.
+    - Keep reviews of other eligible products available.
+    - Preserve existing authentication, eligibility, uniqueness, and CSRF
+    protections.
+    Run the focused tests, full suite, and Ruff. STOP for GREEN approval
+    before Behavior 3.Do not migrate the development database, stage,
+    commit, push, or change either existing review.
+12. I approve Behavior 2 GREEN. All 750 tests pass.Proceed with Behavior 3
+    RED only.Test that staff can clear a restriction through a
+    confirmation page and CSRF-protected POST, while customers cannot.
+    Verify the restriction is removed only when authorized and that the
+    customer can review again afterward.Show the expected failing
+    assertions, then STOP before GREEN.Do not migrate my development
+    database, modify my existing reviews, or stage, commit, or push
+    anything.
+13. I approve Phase 5 Behavior 3 RED, including all 10 cases and both
+    proposed messages.Proceed with GREEN for Behavior 3 only.- Secure the
+    Restrictions list and clear action with StaffRequiredMixin.
+    - Keep GET confirmation-only and require CSRF-protected POST to clear.
+    - Display the approved success or repeated-clear message.
+    - Preserve unrelated restrictions and restore review eligibility
+    appropriately.
+    Run the targeted tests, full suite, and Ruff.STOP for GREEN approval
+    before the remaining Phase 5 work. Do not migrate the development
+    database or stage, commit, or push.
+14. I approve Phase 5 Behavior 3 GREEN. All 760 tests pass.Complete the
+    remaining Phase 5 work: Restrictions dashboard, admin safeguards,
+    product deletion warning, regression tests, and final checks.Then STOP
+    before applying the database migration. Request approval to create and
+    verify a new, separate restrictions backup first.Preserve my existing
+    reviews and database. Do not stage, commit, push, or begin Phase 6.
+15. I approve creating only db.sqlite3.before-restrictions-backup.I'll stop
+    the development server first.Check that the destination doesn't exist,
+    then create the backup without overwriting anything.Verify the source
+    and backup have identical SHA-256 hashes and report their
+    sizes.Preserve my two existing backups and published MindSync and
+    SyncRest reviews.STOP after backup verification. Do not run
+    migrations, stage, commit, or push.
+16. I've stopped the Django development server.Check again for running
+    Django processes. If any remain, report them and stop.If none remain,
+    create and verify db.sqlite3.before-restrictions-backup without
+    overwriting anything.Confirm matching SHA-256 hashes and preserve both
+    older backups.Do not run migrations or Git operations yet.
+17. I approve applying the Phase 5 migration.First run uv run python
+    manage.py migrate --plan.Only if the plan shows exactly
+    reviews.0002_reviewrestriction, run uv run python manage.py
+    migrate.Then verify the new restrictions table exists and is empty,
+    database integrity is OK, and both published reviews remain
+    unchanged.Preserve all three backups.STOP after verification. Do not
+    stage, commit, push, or begin Phase 6.
+18. Phase 5 browser verification passed, including the customer 403
+    check.Complete the Phase 5 PROMPTS.md documentation and rerun all
+    final tests, Ruff, and Django checks.Show the exact proposed Git
+    staging list and diff summary, including the new migration file.Do not
+    stage, commit, or push yet. Exclude the development database, all
+    three backups, and generated CSS.Stop for approval before Phase 6.
+
+### Summary
+- **Outcome:** an author who deletes a review staff hid can't simply post
+  it again. A restriction stays behind for that product until staff clear
+  it, and the customer's other products are unaffected.
+  - **Phase 4 commit (prompts 1–5):** the 12 reviewed files were staged by
+    path and committed as `340bd51`, a new commit on top of `0cd0a12`.
+    - **The repeated commit request (prompt 3):** the agent checked the
+      state read-only and stopped, with no second commit, amend or
+      staging. In prompt 5 the developer explained it was a deliberate
+      idempotency check.
+    - **The push:** to `origin/main` as a fast-forward after a fresh
+      fetch.
+    - **A saved memory:** the agent recorded the rule — verify an
+      already-done instruction and change nothing — in its project memory.
+  - **Planning (prompts 6–8):** three behaviors, in order 1 → 2 → 3, and
+    ten decisions, all approved. Among them:
+    - a restricted create URL gets 403;
+    - the restriction message wins over "ineligible";
+    - clearing a missing restriction redirects with an info message, not
+      a 404;
+    - the Restrictions page sits under the Reviews tab;
+    - the admin has no Add for restrictions;
+    - the delete warning counts every review.
+
+    The developer's item 2, "deleting a published review doesn't
+    restrict", already worked from Phase 2, so it became a case inside
+    Behavior 1. Creating, not applying, `0002_reviewrestriction.py` was
+    explicitly authorized (prompt 8), because the RED test needs the table
+    in pytest's database.
+  - **TDD (prompts 8–13):** three approved behaviors, each RED on an
+    assertion, then GREEN with the full suite run:
+    1. **What deleting leaves behind.** Cases: hidden, hidden with a
+       restriction already there, hidden and deleted twice, and published.
+       Two normal guards: the database's one-per-pair constraint, and a
+       forced delete failure leaving neither a restriction nor a missing
+       review. GREEN put `update_or_create` and the delete in one
+       `transaction.atomic()` in `delete_by_author()`, copying the reason,
+       moderator and time, and never the rating or comment.
+    2. **A restriction blocks that product only.** GET and POST to create
+       get 403 and nothing is saved. The product page shows the approved
+       message instead of **Write a review**, and a second Delivered
+       product can still be reviewed. GREEN added
+       `ReviewRestriction.applies()`, checked in `can_create` and in a new
+       `"restricted"` visitor state.
+    3. **Clearing a restriction.** Ten cases: anonymous visitors to login,
+       both customers 403, a POST without CSRF 403, a staff GET only
+       confirming, a staff POST clearing it with the success message and
+       the customer able to review again, and clearing twice giving the
+       info message. RED used a skeleton built deliberately without the
+       staff check, test-only until its GREEN, which added
+       `StaffRequiredMixin` and `ReviewRestriction.clear()`: one targeted
+       delete that reports whether it removed anything.
+  - **Normal Phase 5 work (prompt 14):**
+    - The Restrictions page: 25 a page, the PRD's columns, "Former staff
+      member", an empty state, and a link from the Reviews list.
+    - `ReviewRestrictionAdmin`: read-only, no Add, deletion allowed.
+    - The product-delete warning: "This will also permanently delete N
+      reviews. This can't be undone in the store."
+    - The Phase 2 hidden-delete test updated to expect a restriction.
+    - 18 normal tests: the page, other restrictions surviving a clear, a
+      made-up id, a restricted customer who's ineligible or now staff, the
+      cascades, the admin (including that admin deletion creates no
+      restriction), and the warning.
+    - The suite went from 743 to 778.
+  - **Backup and migration (prompts 15–17):**
+    - The first check found 5 `runserver` processes still running, so the
+      agent made no copy and waited.
+    - With the server stopped, it created
+      `db.sqlite3.before-restrictions-backup`: 360,448 bytes, SHA-256
+      matching the source (`918DED56…`), integrity ok, both reviews
+      present, and only `0001` applied. Both older backups' hashes were
+      unchanged.
+    - `migrate --plan` listed only `reviews.0002_reviewrestriction`, and
+      `migrate` applied it.
+    - Afterwards: integrity ok, the restrictions table empty, both review
+      rows identical to the backup field by field, and all three backups
+      unchanged.
+  - **Browser verification (prompt 18):** done by the developer, including
+    the customer 403 check.
+- **Deviations:**
+  - Item 2 was a case inside Behavior 1 rather than its own cycle, because
+    it already passed.
+  - The migration file was created before Behavior 1's RED, with explicit
+    approval. Applying it waited for the backup.
+  - The agent never wrote out Phase 5 browser steps. After the migration
+    it stopped as instructed, and the developer verified in the browser on
+    their own.
+- **Sideways:**
+  - **Repeated prompts.** The same Phase 5 request arrived three times
+    (prompts 6 and 7). The agent answered once and pointed back to it.
+  - **A RED that wasn't an assertion.** Two Behavior 1 cases first failed
+    with a `ValueError` from tuple unpacking. They were rewritten as an
+    explicit count assertion before RED was reported.
+  - **Two date tests that depended on the time of day.** During Behavior
+    2's GREEN, two Phase 2 tests failed at 00:08 UTC. They built dates
+    from the current UTC time, which displayed as the previous day in
+    Chicago. They now use fixed noon-UTC datetimes; the assertions are
+    unchanged.
+  - **Small fixes:** one edit matched twice and was redone with more
+    context. A new test compared the full message list across a GET and a
+    POST that shared a session; it now checks that the message is present.
+  - **A misleading migration check.** `showmigrations` against the
+    in-memory database said nothing about the real one. The agent checked
+    `db.sqlite3` read-only instead.
+
 ## 2026-10-18 — Product reviews Phase 4: back-office moderation (hide and restore)
 
 ### Prompts

@@ -23,7 +23,7 @@ from accounts.mixins import StaffRequiredMixin
 from products.models import Product
 
 from .forms import HideReviewForm, ReviewForm
-from .models import Review
+from .models import Review, ReviewRestriction
 
 
 class ReviewCreateView(UserPassesTestMixin, CreateView):
@@ -233,3 +233,63 @@ class RestoreReviewView(StaffRequiredMixin, View):
                 request, "This review is already published; nothing was changed."
             )
         return redirect("reviews:manage_review_detail", pk=review.pk)
+
+
+# --- The back office: restrictions --------------------------------------------
+#
+# Staff-only, like every back-office screen. Clearing is two steps: a GET
+# confirmation that changes nothing, then a CSRF-protected POST.
+
+ALREADY_CLEARED = "This restriction was already cleared; nothing was changed."
+
+
+class ManageRestrictionListView(StaffRequiredMixin, ListView):
+    """Every active restriction, newest first, 25 a page."""
+
+    template_name = "reviews/manage_restrictions.html"
+    context_object_name = "restrictions"
+    paginate_by = 25
+    extra_context = {"section": "reviews"}
+    queryset = ReviewRestriction.objects.select_related("user", "product", "hidden_by")
+
+
+class ClearRestrictionView(StaffRequiredMixin, View):
+    """GET: a confirmation page naming the customer and product.
+    POST: clear the restriction, so the customer may review again.
+
+    A restriction that's already gone — cleared by someone else, or a
+    second click — redirects to the list with an info message, by GET or
+    POST, rather than a 404.
+    """
+
+    def get(self, request, pk):
+        restriction = self.restriction(pk)
+        if restriction is None:
+            return self.already_cleared()
+        return render(
+            request,
+            "reviews/manage_restriction_confirm_clear.html",
+            {"restriction": restriction, "section": "reviews"},
+        )
+
+    def post(self, request, pk):
+        restriction = self.restriction(pk)
+        if restriction is None or not restriction.clear():
+            return self.already_cleared()
+        messages.success(
+            request,
+            f"Restriction cleared. {restriction.user.username} can review "
+            f"{restriction.product.name} again.",
+        )
+        return redirect("reviews:manage_restrictions")
+
+    def restriction(self, pk):
+        return (
+            ReviewRestriction.objects.select_related("user", "product")
+            .filter(pk=pk)
+            .first()
+        )
+
+    def already_cleared(self):
+        messages.info(self.request, ALREADY_CLEARED)
+        return redirect("reviews:manage_restrictions")

@@ -27,6 +27,16 @@ urlpatterns = [
         name="manage_reviews",
     ),
     path(
+        "backoffice/reviews/restrictions/",
+        views.ManageRestrictionListView.as_view(),
+        name="manage_restrictions",
+    ),
+    path(
+        "backoffice/reviews/restrictions/<int:pk>/clear/",
+        views.ClearRestrictionView.as_view(),
+        name="manage_restriction_clear",
+    ),
+    path(
         "backoffice/reviews/<int:pk>/",
         views.ManageReviewDetailView.as_view(),
         name="manage_review_detail",

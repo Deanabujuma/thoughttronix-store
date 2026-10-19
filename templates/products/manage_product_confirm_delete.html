@@ -10,6 +10,12 @@
         This removes the product from the store permanently. Past orders keep
         their purchase-time copy of its name and price.
       </p>
+      {% if review_count %}
+        <div class="alert alert-warning" role="alert">
+          This will also permanently delete {{ review_count }} review{{ review_count|pluralize }}.
+          This can't be undone in the store.
+        </div>
+      {% endif %}
       <form method="post" class="mt-4 flex justify-end gap-2">
         {% csrf_token %}
         <a href="{% url 'products:manage_products' %}" class="btn btn-ghost">Cancel</a>

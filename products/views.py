@@ -150,12 +150,19 @@ class ManageProductUpdateView(StaffRequiredMixin, SuccessMessageMixin, UpdateVie
 
 
 class ManageProductDeleteView(StaffRequiredMixin, SuccessMessageMixin, DeleteView):
+    """Delete a product — its reviews go with it, so the page says how many."""
+
     model = Product
     context_object_name = "product"
     template_name = "products/manage_product_confirm_delete.html"
     success_url = reverse_lazy("products:manage_products")
     success_message = "Product deleted."
     extra_context = {"section": "products"}
+
+    def get_context_data(self, **kwargs):
+        # Every review, hidden ones too: all of them are deleted.
+        kwargs["review_count"] = self.object.reviews.count()
+        return super().get_context_data(**kwargs)
 
 
 class ManageCatalogView(StaffRequiredMixin, TemplateView):
