@@ -9,10 +9,18 @@ Demo logins (documented in the README):
     admin / admin123        superuser
     employee / employee123  staff, "Junior Thought Curator"
     customer / customer123  a plain customer, with order history, a live
-                            cart, a wishlist, and two saved addresses
+                            cart, a wishlist, two saved addresses, and
+                            reviews in every state (see below)
 
 Discount codes: THOUGHTS10 (live, whole order), HUB15 (live, Seraphine
 hubs), SUMMER20 (expired), LAUNCH25 (retired). Some seeded orders used them.
+
+Reviews come only from customers who received the product. The demo
+customer's MindSync review is published and edited, their DreamWeaver
+review is hidden by employee, and SyncRest is still theirs to review.
+Background customers add a varied mix, and one is restricted from
+reviewing again. Reviews draw from their own RNG, after every order and
+coupon draw, so they leave the rest of the demo world exactly as it was.
 """
 
 import random
@@ -22,12 +30,14 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.template.defaultfilters import pluralize
 from django.utils import timezone
 from django.utils.text import slugify
 
 from accounts.models import Address
 from orders.models import Cart, Coupon, Order, OrderItem
 from products.models import Category, Product, Tag
+from reviews.models import Review, ReviewRestriction
 from wishlist.models import Wishlist
 
 TAGS = [
@@ -545,6 +555,66 @@ BACKGROUND_COUPON_USE = [
     ("THOUGHTS10", 0.2, range(0, 45)),
 ]
 
+# Reviews draw from their own RNG, and only after every order and coupon
+# draw: adding them can't shift a single existing seeded value.
+REVIEW_RNG_SEED = 1716
+
+# The demo customer's reviews, fixed rather than drawn: (product slug,
+# rating, comment, state). The rest of their products stay unreviewed —
+# SyncRest (eligible: shows "Write a review"), Seraphine Mini (Shipped)
+# and Veil (Placed).
+CUSTOMER_REVIEWS = [
+    (
+        "mindsync",
+        4,
+        "Took a week to stop hearing my coworkers' lunch orders. Now I "
+        "can't imagine meetings without it.",
+        "edited",
+    ),
+    (
+        "dreamweaver",
+        1,
+        "Ordered a beach. Got my landlord's dream about late rent. Contact "
+        "me at the number in my profile for the full story.",
+        "hidden",
+    ),
+]
+CUSTOMER_HIDDEN_REASON = "Asks readers to contact the reviewer privately."
+
+# Background customers review some of what they received.
+REVIEW_CHANCE = 0.55
+RATINGS, RATING_WEIGHTS = [1, 2, 3, 4, 5], [1, 1, 2, 4, 4]
+COMMENT_CHANCE = 0.7
+EDIT_CHANCE = 0.2
+HIDE_CHANCE = 0.12
+REVIEW_COMMENTS = [
+    "Exactly as advertised, which is somehow the unsettling part.",
+    "Setup took five minutes. Forgetting it was there took a week.",
+    "My thoughts have never been this organized. Or this public.",
+    "Works great, though it finishes my sentences a little too eagerly.",
+    "Battery life is excellent. My sense of privacy, less so.",
+    "Arrived early. It knew I'd be home.",
+    "Solid build quality. The hum is calming once you stop asking why.",
+    "Returned the first one; the replacement is much quieter about it.",
+    "Five stars from me, four from my spouse, who wasn't asked.",
+    "Does what it says. I've stopped asking what else it does.",
+]
+HIDE_REASONS = [
+    "Off-topic: describes a different product.",
+    "Contains another customer's personal details.",
+    "Promotes a competitor's store.",
+]
+RESTRICTION_REASON = "Repeated personal attacks on other reviewers."
+
+# Fixed offsets from each review's qualifying order. Delivered orders are
+# at least 15 days old, so every timestamp lands before the seed's "now".
+POSTED_AFTER_ORDER = timedelta(days=2)
+EDITED_AFTER_POSTING = timedelta(days=3)
+# A day after the review's last change: hidden reviews can't be edited,
+# so a hide never comes before an edit.
+HIDDEN_AFTER_LAST_CHANGE = timedelta(days=1)
+RESTRICTED_AFTER_HIDING = timedelta(days=1)
+
 
 class Command(BaseCommand):
     help = "Wipe and rebuild the demo world: catalog, tags, and demo accounts."
@@ -560,6 +630,7 @@ class Command(BaseCommand):
         self._create_customer_addresses()
         self._create_coupons()
         self._create_orders()
+        self._create_reviews()
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -570,12 +641,27 @@ class Command(BaseCommand):
                 f"{Order.objects.count()} orders, "
                 f"{Coupon.objects.count()} discount codes, "
                 f"and a live cart, a {len(CUSTOMER_WISHLIST)}-item wishlist, and "
-                f"{Address.objects.count()} saved addresses for 'customer'."
+                f"{Address.objects.count()} saved addresses for 'customer'. "
+                f"{self._reviews_summary()}"
             )
+        )
+
+    def _reviews_summary(self):
+        """E.g. "47 reviews (7 hidden) and 1 review restriction." """
+        reviews = Review.objects.count()
+        hidden = Review.objects.filter(status=Review.Status.HIDDEN).count()
+        restrictions = ReviewRestriction.objects.count()
+        return (
+            f"{reviews} review{pluralize(reviews)} ({hidden} hidden) and "
+            f"{restrictions} review restriction{pluralize(restrictions)}."
         )
 
     def _wipe(self):
         """Remove everything the seed owns; the rebuild starts from zero."""
+        # Restrictions, then reviews — explicitly, every one, rather than
+        # trusting cascades from products and users to catch them all.
+        ReviewRestriction.objects.all().delete()
+        Review.objects.all().delete()
         Order.objects.all().delete()
         Coupon.objects.all().delete()  # after orders: used codes are protected
         Cart.objects.all().delete()
@@ -810,3 +896,122 @@ class Command(BaseCommand):
                 quantity=quantity,
                 discount_amount=line_discount,
             )
+
+    def _create_reviews(self):
+        """Demo reviews, only from customers who received the product.
+
+        The demo customer's are fixed. Each background customer reviews
+        some of the products on their own Delivered orders, drawn from a
+        separate RNG, so the order and coupon sequences stay exactly as
+        they were. One background customer is left restricted, as if they
+        had deleted a review staff hid.
+
+        Every timestamp is set explicitly, at fixed offsets from the
+        qualifying order — never from the model's default clock — so two
+        runs at the same "now" store identical reviews.
+        """
+        User = get_user_model()
+        employee = User.objects.get(username="employee")
+        customer = User.objects.get(username="customer")
+
+        for slug, rating, comment, state in CUSTOMER_REVIEWS:
+            product = Product.objects.get(slug=slug)
+            ordered = (
+                Order.objects.filter(
+                    user=customer, status=Order.Status.DELIVERED, items__product=product
+                )
+                .order_by("created_at")
+                .values_list("created_at", flat=True)
+                .first()
+            )
+            self._create_review(
+                customer,
+                product,
+                rating,
+                comment,
+                posted=ordered + POSTED_AFTER_ORDER,
+                edited=state == "edited",
+                hidden_by=employee if state == "hidden" else None,
+                hidden_reason=CUSTOMER_HIDDEN_REASON,
+            )
+
+        rng = random.Random(REVIEW_RNG_SEED)
+        delivered = (
+            OrderItem.objects.filter(
+                order__status=Order.Status.DELIVERED,
+                order__user__username__in=[u for u, *_ in BACKGROUND_CUSTOMERS],
+            )
+            .select_related("order__user", "product")
+            .order_by("order__created_at", "order__user__username", "product__slug")
+        )
+        seen = set()
+        restricted = False
+        for item in delivered:
+            pair = (item.order.user_id, item.product_id)
+            if pair in seen:
+                continue  # reviewed (or skipped) at its first Delivered order
+            seen.add(pair)
+            posted = item.order.created_at + POSTED_AFTER_ORDER
+            if rng.random() >= REVIEW_CHANCE:
+                if not restricted:
+                    # The first background pair left unreviewed: a review
+                    # staff hid, then its author deleted.
+                    hidden_at = posted + HIDDEN_AFTER_LAST_CHANGE
+                    ReviewRestriction.objects.create(
+                        user=item.order.user,
+                        product=item.product,
+                        hidden_reason=RESTRICTION_REASON,
+                        hidden_by=employee,
+                        hidden_at=hidden_at,
+                        created_at=hidden_at + RESTRICTED_AFTER_HIDING,
+                    )
+                    restricted = True
+                continue
+            rating = rng.choices(RATINGS, RATING_WEIGHTS)[0]
+            comment = (
+                rng.choice(REVIEW_COMMENTS) if rng.random() < COMMENT_CHANCE else ""
+            )
+            edited = rng.random() < EDIT_CHANCE
+            hidden = rng.random() < HIDE_CHANCE
+            self._create_review(
+                item.order.user,
+                item.product,
+                rating,
+                comment,
+                posted=posted,
+                edited=edited,
+                hidden_by=employee if hidden else None,
+                hidden_reason=rng.choice(HIDE_REASONS) if hidden else "",
+            )
+
+    def _create_review(
+        self,
+        user,
+        product,
+        rating,
+        comment,
+        *,
+        posted,
+        edited,
+        hidden_by,
+        hidden_reason,
+    ):
+        """One review, with every timestamp an explicit offset from ``posted``."""
+        edited_at = posted + EDITED_AFTER_POSTING if edited else None
+        fields = {}
+        if hidden_by:
+            fields = {
+                "status": Review.Status.HIDDEN,
+                "hidden_by": hidden_by,
+                "hidden_at": (edited_at or posted) + HIDDEN_AFTER_LAST_CHANGE,
+                "hidden_reason": hidden_reason,
+            }
+        Review.objects.create(
+            user=user,
+            product=product,
+            rating=rating,
+            comment=comment,
+            created_at=posted,
+            edited_at=edited_at,
+            **fields,
+        )

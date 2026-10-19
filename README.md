@@ -32,8 +32,24 @@ The `seed` command creates a fixed demo world — the same one every run:
 | Username   | Password      | Who they are                                                  |
 | ---------- | ------------- | ------------------------------------------------------------- |
 | `admin`    | `admin123`    | Superuser: everything below, plus the Django admin at `/admin/` |
-| `employee` | `employee123` | Staff: the back office (products, orders, dashboard)           |
-| `customer` | `customer123` | A customer with order history, a live cart, and a wishlist (one item now unavailable) |
+| `employee` | `employee123` | Staff: the back office (products, orders, reviews and restrictions, dashboard) |
+| `customer` | `customer123` | A customer with order history, a live cart, a wishlist (one item now unavailable), and reviews in every state |
+
+### Demo reviews
+
+Only customers who received a product (a Delivered order) can review it, and
+the seed follows the same rule. Signed in as `customer`:
+
+- **MindSync** — your published review, marked "Edited", with Edit and Delete.
+- **DreamWeaver** — your review, hidden by staff with a reason; Delete only.
+- **SyncRest** — received but not yet reviewed, so it offers **Write a review**.
+- **Seraphine Mini** and **Veil** — not delivered yet, so you can't review them.
+
+Background customers add a varied mix of published, edited and hidden
+reviews, and one of them is restricted from reviewing a product again. As
+`employee`, see them under **Back office → Reviews** and its **Restrictions**
+page. A product's reviews show 10 to a page; no seeded product has enough
+reviews to fill a second page.
 
 ## Commands
 

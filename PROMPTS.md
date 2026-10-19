@@ -28,6 +28,179 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-18 — Product reviews Phase 6: demo reviews in the seed
+
+### Prompts
+The same agent session as the Phase 5 entry below, which records its own
+prompts 1–18. Prompt text is verbatim, missing spaces after full stops
+included. Prompts 1–3 staged, committed and pushed Phase 5; they are
+recorded here because that entry was already committed. Every prompt in
+this entry was typed directly, so `/implement` never ran as a command and
+the agent followed it and `/tdd` directly.
+
+1. I approve staging exactly the 17 proposed Phase 5 files, including the
+   new migration.Stage only the approved paths. Do not use git add . or
+   git add -A.Show the staged file list, diff summary, and Git
+   status.Verify that db.sqlite3, all three backups, generated CSS, and
+   unrelated files remain excluded.Do not commit or push yet. Stop for my
+   final approval.Proposed commit: feat(reviews): add Phase 5 hidden
+   review restrictions
+2. I approve committing the 17 staged Phase 5 files.Use the commit
+   message:feat(reviews): add Phase 5 hidden review restrictionsDo not
+   stage any additional files or include the database, backups, or
+   generated CSS.After committing, report the commit hash and Git
+   status.Do not push or begin Phase 6 yet. Stop for my separate approval.
+3. I approve pushing commit 4fe2b56 to origin/main.First confirm a safe
+   fast-forward, then push normally.Do not create another commit,
+   force-push, or stage additional files.Confirm GitHub is synchronized
+   and report Git status.Preserve my development database, all three
+   backups, and existing reviews.STOP after the push. Do not begin Phase 6
+   yet.
+4. Begin Phase 6: Demo Data and Final Verification.Review the PRD, plan,
+   seed command, and existing tests.Propose up to three TDD behaviors
+   covering eligible demo reviews, deterministic and repeatable seeding,
+   and preservation of existing demo data and dashboard metrics.STOP for
+   my approval before writing code.Do not run seed, reset, or migrations
+   on my development database. Preserve my existing reviews and all three
+   backups. Do not stage, commit, or push.
+5. I approve Phase 6's two TDD behaviors, the characterization test first,
+   and all seven design decisions.Begin with the seed-data
+   characterization test only.Use pytest's isolated database and a fixed
+   clock. Record the existing orders, coupons, carts, wishlists,
+   addresses, and dashboard metrics.Show the baseline and prove the test
+   passes before changing seed.py.STOP for approval before Behavior 1
+   RED. Do not run seed against my development database or change any
+   backups.
+6. I approve the Phase 6 characterization test.Begin Behavior 1 RED
+   only.Test that seeded reviews come exclusively from eligible
+   Delivered-order customers, contain no duplicate customer/product
+   pairs, and demonstrate the approved published, edited, hidden, and
+   restricted states.Use the existing fixed clock and isolated pytest
+   database.Demonstrate a genuine failing assertion, then STOP before
+   GREEN.Preserve the baseline test, development database, all three
+   backups, and existing reviews.
+7. I approve Behavior 1 RED.Implement Behavior 1 GREEN only using eligible
+   Delivered-order customers and a separate deterministic review RNG.Keep
+   the existing demo data and dashboard metrics unchanged.Run the review
+   test, baseline test, existing seed tests, and Ruff checks.STOP for
+   approval before Behavior 2 RED.Do not modify my development database,
+   backups, or existing published reviews. Do not stage, commit, or push.
+8. Behavior 1 GREEN is approved. Leave the placeholder timestamps
+   unchanged.Proceed directly to Behavior 2 RED, testing timeline
+   correctness and repeatable seed output.Show the failing assertion,
+   confirm the previous tests still pass, and stop before GREEN.
+9. I approve Behavior 2 RED.Implement the approved timestamp offsets,
+   explicitly saving them rather than relying on Django's default
+   clock.Verify that the complete set of seeded reviews and restrictions
+   is identical across repeated runs.Keep all existing demo data and
+   dashboard metrics unchanged.STOP for GREEN approval. Do not stage,
+   commit, push, or modify my development database.
+10. I approve Behavior 2 GREEN.Finish the remaining Phase 6 work: seed
+    cleanup, updated success message, README demo instructions, and
+    PROMPTS.md documentation.Run the full test suite, Ruff, Django checks,
+    and migration checks.Show the exact proposed Git staging list.Do not
+    stage, commit, or push yet. Preserve my development database, existing
+    reviews, and all three backups.Stop for approval.
+
+### Summary
+- **Outcome:** `seed` builds a demo world with reviews in every state:
+  - 47 reviews: 40 published, 7 hidden, 13 edited;
+  - 1 restriction;
+  - all from customers who received the product.
+
+  It's identical every run at the same clock, and it leaves every existing
+  order, discount code, cart, wishlist, address and dashboard figure
+  exactly as it was. Phase 6 was verified only in pytest's isolated
+  database, as approved in the plan; `seed` never ran against
+  `db.sqlite3`.
+  - **Phase 5 commit (prompts 1–3):** the 17 reviewed files, including
+    `0002_reviewrestriction.py`, were staged by path and committed as
+    `4fe2b56`, a new commit on top of `340bd51`. It was pushed to
+    `origin/main` as a fast-forward.
+  - **Planning (prompts 4–5):**
+    - **Two TDD behaviors, not three.** The developer's third area,
+      preserving existing data, already held, so it couldn't start RED. It
+      became a **characterization test** written before any seed change.
+    - **Seven decisions,** all approved: freezing the clock by
+      monkeypatching `timezone.now` (no new dependency); a separate review
+      RNG drawn last; a fixed list of comments; fixed date offsets; hidden
+      fields set directly; a restriction row with no review behind it; and
+      automated-only verification.
+  - **The characterization test (prompt 5):** `products/test_seed_baseline.py`
+    seeds at a frozen 2026-10-18 17:00 UTC and snapshots, by natural keys,
+    every order and its lines, the discount codes, the customer's cart,
+    wishlist and addresses, all users, and the five dashboard queries. The
+    canonical-JSON SHA-256 recorded before any change is `7d389c62…bfba774`.
+    The snapshot has 52 orders and 109 lines, and the dashboard shows
+    $57,395.20 from 47 sales. Readable figures are asserted before the
+    digest. Two throwaway probes, since deleted, showed the digest is
+    stable across runs and changes when a single cent changes.
+  - **TDD (prompts 6–9):** two approved behaviors, each RED on an
+    assertion, then GREEN:
+    1. **Genuine reviews in every demo state.** Every author is a regular
+       customer with a Delivered order for that exact product; there are
+       no duplicate pairs and no product has more reviews than its
+       Delivered customers. The demo `customer` has MindSync published and
+       edited, DreamWeaver hidden by `employee`, and SyncRest, Seraphine
+       Mini and Veil unreviewed. Background customers have a mix, and
+       there's exactly one restriction, on a background customer with no
+       review left. RED: `assert 0 > 0`. GREEN: `_create_reviews()` with
+       `random.Random(1716)`, run after every order and coupon draw;
+       fixed reviews for `customer`; for background customers, one
+       decision per (customer, product) pair at its first Delivered order;
+       and the restriction on the first pair left unreviewed (`gfinch` on
+       seraphine-gen-1). The baseline digest was unchanged.
+    2. **A valid timeline, and the same output every run.** Each review is
+       posted after its order and before `now`; edits and hides come after
+       posting; the restriction runs order < hide < restriction < `now`;
+       all timestamps are aware; and two runs give identical data.
+       Behavior 1's dates were deliberately left as placeholders so this
+       RED would be real. GREEN set every timestamp explicitly, using
+       `POSTED_AFTER_ORDER` (2 days), `EDITED_AFTER_POSTING` (3 days),
+       `HIDDEN_AFTER_LAST_CHANGE` (1 day) and `RESTRICTED_AFTER_HIDING`
+       (1 day), through one `_create_review()` helper.
+  - **Normal Phase 6 work (prompt 10):**
+    - `_wipe()` deletes every restriction, then every review, explicitly.
+    - The success message adds "47 reviews (7 hidden) and 1 review
+      restriction.", using `pluralize`.
+    - The seed's docstring describes the reviews.
+    - The README has a **Demo reviews** section: what `customer` sees on
+      each product, the back-office Reviews and Restrictions pages, and a
+      note that no seeded product fills a second page.
+    - Three tests: the wipe removes reviews and restrictions the seed
+      doesn't manage; review counts are stable over two runs; and the
+      success message is right.
+    - The suite went from 778 to 784.
+- **Deviations:**
+  - The third requested TDD behavior became a characterization test, as
+    proposed and approved.
+  - **The hide date rule was refined.** Decision 4 said "hide = review + 1
+    day". The agent made it 1 day after the review's *last change*, so a
+    hide can never come before an edit, which hidden reviews can't have in
+    the app. No seeded review is both edited and hidden, so no date
+    changed. This was flagged before it was implemented.
+  - There was no browser verification, by the plan's decision: running
+    `seed` on `db.sqlite3` would wipe the developer's real reviews.
+  - The `CLAUDE.md` update for the `reviews` app is still deferred, as the
+    PRD says, until the developer asks.
+- **Sideways:**
+  - **The model's default clock ignores the test's clock.** Behavior 2's
+    RED showed the placeholder `created_at` at the real time (01:14 UTC,
+    Oct 19), not the frozen 17:00. `default=timezone.now` was captured when
+    the model loaded, so monkeypatching didn't reach it. That meant
+    Behavior 1's placeholders weren't actually repeatable. Behavior 2's
+    explicit timestamps fixed it.
+  - **Ruff and the shared clock fixture.** Taking the imported
+    `frozen_clock` fixture as a test argument triggered Ruff `F811`. The
+    tests use `@pytest.mark.usefixtures("frozen_clock")` instead, leaving
+    the baseline file untouched. Ruff's `--fix` later merged the two
+    imports from it.
+  - **A probe that couldn't find its fixture.** The first baseline probe
+    errored because it didn't import `frozen_clock`. That was fixed in the
+    probe, before any value was recorded.
+  - **An inaccurate docstring.** The new seed-review test file's docstring
+    claimed every run used the frozen clock; it was corrected.
+
 ## 2026-10-18 — Product reviews Phase 5: restrictions after deleting a hidden review
 
 ### Prompts
