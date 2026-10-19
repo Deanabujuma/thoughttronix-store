@@ -28,6 +28,771 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-18 — Product reviews: final audit, recovered interview log, Phase 7 inline HTMX (TDD)
+
+### Prompts
+One agent session, 20:44–21:59 local time (01:44–02:59 UTC on Oct 19).
+Prompt text is verbatim from the session transcript, missing spaces after
+full stops included. Prompts 11 and 12 were pasted in; the rest were typed
+directly. A `/clear` before prompt 1 is not listed.
+
+1. Perform a read-only final audit of the Product Reviews assignment. Check
+   every required feature, collect exact code references for my four
+   reflection answers, verify the session log and commits, and report any
+   real gaps.Do not change files or write my reflection.
+2. Search for the original /grill-me interview and its real prompts and
+   answers.If found, report where it is so we can document it
+   accurately.If not found, explain what can be recorded honestly without
+   inventing session history.Do not edit any files yet.
+3. Restore the genuine October 16 /grill-me session from the recovered
+   transcript into PROMPTS.md.Clearly label the entry as recovered
+   retrospectively, preserve the exact prompts, and document what actually
+   happened.Check whether /to-prd was invoked, without inventing skill
+   usage.Edit only PROMPTS.md. Do not commit or push yet.
+4. Gather exact source-code evidence for my four reflection
+   questions.Especially verify the review-delete authorization logic and
+   whether create/edit/delete actually use HTMX hx-post.Include filenames,
+   line numbers, test names, and the original design decision.Do not write
+   the reflection or change any files.
+5. Plan a focused HTMX correction for all three review actions: create,
+   edit, and delete.Preserve existing authorization, CSRF, validation, and
+   non-JavaScript behavior.Identify the templates, endpoints, DOM swaps,
+   tests, and manual browser checks.Do not modify files yet. Stop for
+   approval.
+6. Approve inline HTMX for create/edit/delete, document the correction
+   honestly in the PRD and plan, and use TDD.First update the planning
+   documents and propose up to three TDD behaviors.Stop before writing
+   tests or implementation code. Preserve the development database and
+   backups.
+7. I approve all three Phase 7 TDD behaviors.Begin Behavior 1 RED only.
+   Test successful inline HTMX create, edit, and delete responses,
+   including the updated review section and rating summary.Demonstrate
+   genuine failing assertions.Stop before GREEN. Do not change production
+   code or touch the development database.
+8. I approve Behavior 1 RED.Implement the HTMX success responses for
+   create, edit, and delete using the existing review URLs and
+   permissions.Return the updated reviews section, rating summary, and
+   success message without a redirect.Run the relevant tests and Ruff
+   checks.Stop for GREEN approval. Do not touch the development database
+   or backups.
+9. I approve Behavior 1 GREEN.Begin Behavior 2 RED only: test invalid
+   create/edit forms and duplicate HTMX submissions.The tests must verify
+   inline errors, unchanged data when invalid, and no redirect or server
+   error for duplicate reviews.Stop before GREEN. Preserve the development
+   database and backups.
+10. I approve Behavior 2 RED.Implement inline validation errors for create
+    and edit, and proper HTMX responses for duplicate submissions.Keep the
+    normal Django fallback unchanged and preserve duplicate-review
+    protections.Run the relevant tests and Ruff checks.STOP for GREEN
+    approval before Behavior 3 RED. Do not touch the development database
+    or backups.
+11. I approve Behavior 2 GREEN.Begin Behavior 3 RED only, testing HTMX
+    permissions:- Anonymous → login with return destination.
+    - Unauthorized customer/staff → 403.
+    - No review of your own → 404.
+    - Authors retain their permitted deletion rights.
+    Confirm no data changes on refusals, demonstrate genuine failing
+    assertions, and stop before GREEN.Preserve the development database
+    and backups.
+12. I approve Behavior 3 RED.Implement the HTMX refusal responses:-
+    Anonymous → 204 with HX-Redirect to login.
+    - Unauthorized → 403 with HX-Refresh.
+    - Missing own review → 404 with HX-Refresh.
+    Keep all existing permission rules and deletion rights unchanged.Run
+    tests and Ruff, then stop for GREEN approval. Do not change the
+    development database or backups.
+13. I approve Behavior 3 GREEN.Complete the remaining Phase 7 work: inline
+    buttons, delete confirmation, Cancel/Keep it, and HTMX response
+    headers.Add security and browser-interaction tests, then run the full
+    suite and Ruff.Do not stage, commit, or push yet. Stop before browser
+    verification.
+14. Document the actual Phase 7 browser checks and all TDD checkpoints in
+    PROMPTS.md.Run final tests, Ruff, Django and migration checks.Show the
+    exact proposed staging list, excluding the development database and
+    backups.Do not stage, commit or push yet.
+15. Correct the Phase 7 browser log with my actual observations: inline
+    Edit, Save, Cancel, Delete confirmation, and Keep it all passed.Mark
+    actual deletion and creation as automated-test verified only.Reconcile
+    the staging list: the previous report claimed 16 files but listed only
+    15.Do not stage, commit, or push yet.
+
+### Summary
+- **Outcome:** the audit found two gaps: an unlogged interview and review
+  actions without HTMX. Both were closed. Create, edit and delete now
+  work inline with HTMX, and the old pages remain as the no-JavaScript
+  path. The suite went from 784 to 840 tests, and nothing was committed.
+  - **Audit (prompt 1):**
+    - All six Phase commits were pushed and in sync with `origin/main`.
+      Tests (784), Ruff, `check` and `makemigrations --check` were clean.
+    - Every PRD feature was present.
+    - Gaps reported: the 2026-10-16 interview had no log entry;
+      `CLAUDE.md` doesn't list the `reviews` app (still deferred); the PRD
+      says "DaisyUI `rating`" stars where the form uses native radios.
+    - The four reflection questions aren't in the repository, so code
+      references were gathered by topic.
+  - **The recovered interview (prompts 2–3):**
+    - The 2026-10-16 interview's transcript was found
+      (`5c8f53db-30c8-4735-89cb-845861a31132.jsonl`).
+    - It was added below as a labeled, recovered entry. A script
+      confirmed its 21 prompts match the transcript word for word.
+    - The transcript shows that `/to-prd` was never invoked: there were
+      no Skill calls, and its SKILL.md was never read.
+  - **Evidence (prompt 4):**
+    - The delete authorization path was traced from the URL to
+      `delete_by_author()`.
+    - It confirmed that **no review template used HTMX**. In Q13 the
+      developer had chosen separate pages over an inline HTMX form.
+  - **The correction, planned (prompts 5–6):**
+    - The developer approved inline HTMX for all three actions.
+    - The PRD gained a dated **Amendment: inline HTMX review actions**.
+      It records that it reverses Q13 and doesn't rewrite it, and it adds
+      AC 19–23.
+    - The plan gained **Phase 7**. Three TDD behaviors were proposed and
+      approved.
+  - **TDD (prompts 7–12):** three behaviors. Each was approved at RED and
+    again at GREEN, and each RED failed on an assertion:
+    1. **A successful inline create, edit or delete swaps the section and
+       the summary.**
+       - RED: all three cases `assert 302 == 200`. The views ignored
+         `HX-Request` and redirected.
+       - GREEN:
+         - `reviews_section_context()` moved, unchanged, out of
+           `ProductDetailView`.
+         - `is_htmx()` added.
+         - `ReviewActionMixin.finished()` renders `_reviews_swap.html`
+           (the section plus the out-of-band `_detail_rating_summary.html`)
+           with `HX-Retarget: #reviews` and `HX-Reswap: outerHTML`.
+         - Inline messages show inside the section.
+       - 787 passed.
+    2. **An invalid or duplicate inline submit changes nothing.**
+       - RED: five invalid cases failed on `'<html' not in page` (the
+         whole page came back); two duplicate cases (repeated and
+         concurrent) failed on `302 == 200`.
+       - GREEN:
+         - The form moved into `_review_form.html`, with `hx-post` only
+           when inline.
+         - `ReviewFormMixin` picks the partial for HTMX.
+         - `already_reviewed()` ends in `finished()`.
+         - The savepoint and the re-raising of unrelated
+           `IntegrityError`s are unchanged.
+       - 794 passed.
+    3. **Under HTMX, refusals keep their meaning.**
+       - RED, 22 cases:
+         - six anonymous cases got `302`, not `204`;
+         - twelve 403 cases and four 404 cases got `None == 'true'` for
+           `HX-Refresh`, with the status codes already right.
+       - The fourth test, authors who can't edit still deleting inline,
+         passed at once because of Behavior 1. It was reported as a
+         regression guard, not a RED.
+       - GREEN:
+         - `handle_no_permission()` answers HTMX with 204 and
+           `HX-Redirect` (Django's own `redirect_to_login` URL), or 403
+           with `HX-Refresh`.
+         - `OwnReviewMixin` returns 404 with `HX-Refresh`.
+         - The rules and their order are unchanged.
+       - 819 passed.
+  - **The rest of Phase 7 (prompt 13):**
+    - Write, Edit and Delete keep their `href` and add `hx-get` into the
+      new `#your-review`.
+    - New pieces:
+      - `_review_delete_confirm.html`, which the standalone page includes
+        too;
+      - Cancel and Keep it restore the section with `hx-select="#reviews"`
+        (`_restore_section_attrs.html`);
+      - `inline_template_name` on the shared mixin;
+      - `Vary: HX-Request` on the three views.
+    - 21 more tests: the trigger markup, the inline GETs, the standalone
+      pages free of HTMX, `Vary`, CSRF with `enforce_csrf_checks`,
+      escaping and no usernames or emails, and messages shown once.
+    - 840 passed.
+  - **Final checks (prompt 14):** 840 passed; Ruff lint and format clean;
+    `manage.py check` clean; `makemigrations --check` "No changes
+    detected".
+  - **Browser verification (reported by the developer in prompt 15):**
+    done by the developer as `customer`, on their existing SyncRest
+    review.
+
+    | Check | How verified |
+    |---|---|
+    | Inline **Edit** (the form loads into "Your review") | Browser: passed |
+    | **Save** (the inline edit is saved and the section updates) | Browser: passed |
+    | **Cancel** (the section comes back unchanged) | Browser: passed |
+    | Inline **Delete** confirmation | Browser: passed |
+    | **Keep it** (the section comes back and the review stays) | Browser: passed |
+    | Actually **deleting** a review inline | Automated tests only |
+    | **Creating** a review inline | Automated tests only |
+
+    - The automated tests behind the last two rows:
+      - Behavior 1's `create` and `delete` cases;
+      - the delete-rights cases (including deleting a hidden review,
+        which leaves a restriction);
+      - the duplicate-submit cases;
+      - the CSRF cases.
+    - The other planned steps were not reported, so they are not recorded
+      as browser checks:
+      - a double submit;
+      - the request headers in DevTools;
+      - the sign-out redirect;
+      - staff;
+      - JavaScript disabled;
+      - Refresh and Back.
+
+      The automated tests cover their server side. The full list is in
+      `plans/product-reviews.md` → Phase 7 → Browser verification.
+    - **The database agrees.** A read-only query (`mode=ro`, usernames,
+      products and times only) found that the only change to `db.sqlite3`
+      was the SyncRest review's edit at 21:56:26 local. The review is now
+      5 stars, published, and created earlier on 2026-10-18. There were no
+      new reviews, no deletions of `customer`'s reviews (MindSync and
+      SyncRest both remain), no restrictions, and no other sign-ins.
+      That fits the Save that was checked, and a Delete confirmation and
+      Keep it that changed nothing.
+    - The first version of this bullet, written after prompt 14, said no
+      results had been reported, which was true at the time. Prompt 15
+      supplied them.
+    - Phase 7 has no migrations, so `db.sqlite3` works as it is.
+  - **Data safety:**
+    - The agent never wrote to `db.sqlite3` or the three backups, and
+      `seed` and `migrate` never ran.
+    - The backups' sizes and timestamps were unchanged throughout.
+    - `db.sqlite3` stayed at 19:44 until the 21:56 app edit above.
+- **Deviations:**
+  - **The developer reversed their own Q13 decision.** It is recorded as
+    an amendment in the PRD and plan, not by rewriting them.
+  - **Behavior 3's delete-rights test was never RED.**
+  - **The race fixture `other_tab_wins` is duplicated** in
+    `test_htmx.py`. This was done so `test_views.py` stays unedited.
+    Moving both copies into a shared `reviews/conftest.py` was offered.
+  - **An unknown product slug under HTMX** still gives a plain 404 with no
+    refresh. That case wasn't in the spec.
+  - **The `CLAUDE.md` update** for the `reviews` app is still deferred.
+- **Sideways:**
+  - **The audit missed HTMX.** It checked against the PRD, which had
+    chosen separate pages, so it didn't count the missing `hx-post` as a
+    gap. The developer raised it in prompt 4.
+  - **The reflection questions were never available,** so evidence was
+    grouped by topic.
+  - **Windows encodings:**
+    - A `cmd` redirect wrote the interview's prompts as cp1252, which
+      made en dashes look like `�`. Python confirmed there were exactly
+      three en dashes, and the log uses them.
+    - Extracting this session's prompts first crashed on the cp1252
+      console and was redone writing UTF-8 to a file.
+  - **Small failures, caught at once:**
+    - an `Edit` anchor with the wrong indentation;
+    - a PowerShell parse error from a stray comma.
+  - **A miscounted staging list.**
+    - After prompt 14 the agent reported "16 paths (10 modified, 7 new)".
+      The lists it showed held 15 paths, 9 modified and 6 new, and every
+      listed path was right.
+    - The developer caught it in prompt 15. `git diff --name-only` and
+      `git ls-files --others` confirmed 15, with the database and backups
+      left out.
+  - **`alert-success` is missing from the compiled CSS,** so success
+    messages (including `base.html`'s) render unstyled. This predates
+    Phase 7 and is unfixed, because the Tailwind build is blocked here.
+
+## 2026-10-16 — Product reviews: grill interview and first PRD (no implementation) — recovered retrospectively
+
+*Recovered retrospectively on 2026-10-18.* This session ended without a
+log entry. It is reconstructed from Claude Code's own transcript of the
+session, `5c8f53db-30c8-4735-89cb-845861a31132.jsonl` in the project's
+`~/.claude/projects/` folder, which ran on 2026-10-16 from 19:11 to 20:24
+UTC. It sits at the top because new entries go at the top; the entries
+below it are unchanged.
+
+### Prompts
+Prompt text is verbatim from the transcript; only the line wrapping is
+new. Prompt 1 was typed as a slash command and prompt 2 was typed
+directly. Prompts 3–21 were pasted in. A `/clear` before prompt 1 is not
+listed. The italic question labels are added for reference and were not
+part of the prompts.
+
+1. /grill-me I want to add product reviews, star ratings, and written
+   comments to the ThoughtTronix store. Read CLAUDE.md and explore the
+   existing Django project first. Interview me one question at a time
+   about the feature requirements, user permissions, review display,
+   moderation, and edge cases. Do not write code yet. Once we've made the
+   decisions, help me create a PRD and phased implementation plan.
+   Preserve my existing db.sqlite3 and its backup.
+2. *(Question 1: who may write a review.)* I choose Option B. Only
+   signed-in customers who have purchased a product through an order with
+   Delivered status can submit a review. Placed, Shipped, and Cancelled
+   orders do not qualify. Everyone, including anonymous visitors, should
+   be able to read published reviews and ratings.
+
+   The purchase eligibility rule must be enforced server-side, not just by
+   hiding the review form. Let's continue the interview one question at a
+   time. Do not write code yet.
+3. *(Question 2: employees and the admin.)* I choose Option B. Only regular
+   customers (is_staff=False and is_superuser=False) can submit product
+   reviews, and only after purchasing the product through a Delivered
+   order.
+
+   Employees and administrators can read published reviews but cannot
+   create or edit reviews as customers, even with a qualifying purchase.
+
+   If a customer writes a review and later becomes staff, their existing
+   review remains published, but they cannot edit it or submit another
+   while they have staff privileges.
+
+   Enforce these rules server-side. We can decide moderation permissions
+   later in the interview. Continue with Question 3, one question at a
+   time. Do not write code yet.
+4. *(Question 3: reviews per product, editing and deleting.)* I choose
+   Option A: One review per customer per product, with the ability to edit
+   or delete it.
+
+   Enforce uniqueness with a database constraint on (customer, product).
+   Each customer's rating should count only once toward the product's
+   average rating.
+
+   Customers can edit their star rating and written review while they
+   remain eligible. Record and display the last-edited date when a review
+   changes.
+
+   Deleting a review requires confirmation and permanently removes it. A
+   customer can submit a new review afterward if they still meet the
+   eligibility requirements.
+
+   Recheck authorization on every create, edit, and delete request,
+   including server-side checks. We'll discuss changing order statuses in
+   a later question.
+
+   Continue to Question 4, one question at a time. Do not write code yet.
+5. *(Question 4: what a review contains.)* I choose Option A: A required
+   1–5 whole-star rating and an optional written comment, with a maximum
+   of 2,000 characters.
+
+   No review title is needed. Trim leading and trailing whitespace, and
+   treat whitespace-only comments as empty. Comments must display as
+   escaped plain text with line breaks preserved, with no HTML or Markdown
+   rendering.
+
+   Use accessible, labeled DaisyUI star radio buttons that work without
+   JavaScript. Validate ratings server-side and enforce the 1–5 range with
+   a database check constraint as well.
+
+   Continue to Question 5, one question at a time. Do not write code yet.
+6. *(Question 5: pre- or post-moderation.)* I choose Option B:
+   Post-moderation. Reviews should be published immediately after
+   submission, and staff should be able to hide or restore them through a
+   Reviews tab in the back office.
+
+   Only published reviews should be visible to the public or count toward
+   average ratings and review counts. Hidden reviews must not be publicly
+   accessible. Hiding should be reversible and preserve the original
+   review and rating.
+
+   We'll decide staff deletion permissions, what authors see when their
+   review is hidden, and what happens after editing in separate questions,
+   one at a time.
+
+   Continue to Question 6. Do not write code yet.
+7. *(Question 6: who moderates, and back-office deletion.)* I choose
+   Option A. All staff, including employees and administrators, can hide
+   and restore reviews through the back-office Reviews tab. There should
+   be no permanent Delete action in the back office. Only the review
+   author can delete their own review through the customer interface,
+   while the superuser can manage deletion through Django admin.
+
+   Hide and Restore must be POST-only, CSRF-protected, and authorized
+   server-side using the existing StaffRequiredMixin conventions.
+
+   Record hidden_by and hidden_at for accountability, and display this
+   information in the back office. I also want a short required moderation
+   reason when staff hide a review, so there is a clear record of why it
+   was hidden. We can decide in the next question whether the author sees
+   that reason.
+
+   Continue to Question 7 one question at a time. Do not write code yet.
+8. *(Question 7: what the author of a hidden review sees.)* I choose
+   Option A. When staff hide a review, its author can still see the review
+   marked 'Hidden by staff' along with the moderation reason. The author
+   can delete it with confirmation, but cannot edit it while hidden. Other
+   shoppers and anonymous visitors cannot see hidden reviews, and hidden
+   ratings are excluded from averages and counts.
+
+   Only staff can restore hidden reviews. Restoring clears the active
+   hidden_by, hidden_at, and moderation reason fields.
+
+   I do not want customers to bypass moderation by deleting a hidden
+   review and immediately reposting. If someone deletes a staff-hidden
+   review, they should be restricted from submitting another review for
+   that same product until staff or an administrator clears the
+   restriction. Please account for this in the requirements and discuss
+   the simplest safe implementation in a later question.
+
+   Continue to Question 8, one question at a time. Do not write code yet.
+9. *(Question 8: when the qualifying order stops being Delivered.)* I
+   choose Option A. Once a review has been legitimately published, it
+   stays published even if the order that qualified the customer changes
+   from Delivered to another status. Reviews should not automatically
+   disappear or reappear when an order's status changes. Staff can still
+   hide inappropriate reviews through moderation.
+
+   Creating a review requires a regular non-staff customer with a
+   qualifying Delivered order, no existing review for that product, and no
+   active repost restriction.
+
+   Editing requires current eligibility, ownership, and a review that is
+   not hidden.
+
+   I also approve the rule that authors can always delete their own
+   reviews, even if their order status changes, the review is hidden, or
+   they later become staff. Deleting a staff-hidden review must preserve
+   the repost restriction we previously agreed on, so deletion cannot
+   bypass moderation.
+
+   Enforce all permissions server-side. Continue to Question 9, one
+   question at a time. Do not write code yet.
+10. *(Question 9: storing the repost restriction.)* I choose Option A: a
+    separate ReviewRestriction model with a unique constraint on
+    (customer, product).
+
+    When a customer deletes their own hidden review, permanently delete
+    the review and atomically create a restriction for that customer and
+    product. The restriction should retain only the necessary moderation
+    metadata, never the deleted review's comment or rating.
+
+    Deleting a published review creates no restriction. Deletion by a
+    superuser through Django admin does not create a restriction.
+
+    While restricted, the customer cannot submit a new review for that
+    product but can still review other eligible products. Show this
+    message instead of the review form: "You cannot currently review this
+    product. If you believe this is a mistake, please contact our team."
+
+    Do not repeat the moderation reason in that message. Staff can clear
+    restrictions using a POST-only, CSRF-protected action in the Reviews
+    tab. Superusers can also manage them in Django admin.
+
+    Keep the delete-and-restrict operation in one transaction and
+    centralize the logic so customer-facing deletion cannot bypass it.
+    Continue with Question 10, one question at a time. Do not write code
+    yet.
+11. *(Question 10: where ratings appear.)* I choose Option B: Display
+    average star ratings and published review counts on both the product
+    detail page and catalog product cards.
+
+    Only published reviews count toward averages and totals; hidden
+    reviews must be excluded. Display averages rounded to one decimal
+    place and visual stars rounded to the nearest half star, without
+    changing the underlying stored ratings.
+
+    For products with zero published reviews, show 'No reviews yet'
+    instead of 0.0 stars. Make the stars accessible with a descriptive
+    screen-reader label and decorative icons hidden from assistive
+    technology.
+
+    Use efficient Django queryset annotations for the catalog to avoid N+1
+    queries. Do not add rating-based sorting or filtering yet, and do not
+    add ratings to wishlist cards in this phase.
+
+    Continue to the next interview question, one at a time. Do not write
+    code yet.
+12. *(Question 11: how reviewers are identified.)* I choose Option B:
+    Public reviews should identify authors only as 'Verified buyer,' never
+    by their username, email, or real name.
+
+    Show the review's star rating, original posted date, and an edited
+    date if applicable. The 'Verified buyer' label means the author had a
+    qualifying Delivered order at the time of submission, even if the
+    order status changes later.
+
+    In the staff-only Reviews tab and Django admin, show the actual
+    username for moderation purposes. Do not add a display-name field or
+    publicly reveal account identifiers.
+
+    Continue to Question 12, one question at a time. Do not write code
+    yet.
+13. *(Question 12: order and pagination.)* I choose Option B: Display
+    product reviews newest first, with 10 reviews per page using Django's
+    built-in Paginator and normal pagination links. Use a dedicated query
+    parameter such as ?reviews=2 and link to the #reviews section. No HTMX
+    load-more feature or review sorting options are needed yet.
+
+    Pin the signed-in author's own review at the top as 'Your review,'
+    whether published or hidden, and exclude it from the paginated public
+    list to prevent duplication. Hidden reviews must not appear in the
+    public list.
+
+    Sort by original creation date descending, breaking ties by primary
+    key descending. Editing a review must not change its position.
+
+    Handle invalid and out-of-range page numbers gracefully, and show a
+    designed 'No reviews yet' empty state when there are no published
+    reviews. Pagination must work without JavaScript.
+
+    Continue to Question 13, one question at a time. Do not write code
+    yet.
+14. *(Question 13: the customer pages and visitor states.)* I choose
+    Option A: Separate Django pages for writing, editing, and deleting
+    product reviews, using standard class-based views and normal form
+    submissions. Keep review URLs based on the product slug and current
+    user, without exposing review IDs as editable URL parameters.
+
+    After successful create, edit, or delete, redirect to the product
+    detail page's #reviews section with a success message. Form validation
+    errors should re-display on the relevant form page.
+
+    I agree with the proposed visitor states: anonymous shoppers get a
+    sign-in link with a return destination; customers without a Delivered
+    order get an eligibility message; eligible customers can write a
+    review; published review authors can edit and delete; hidden review
+    authors can delete only and see the moderation reason; ineligible
+    former customers or newly promoted staff authors can delete only;
+    restricted customers see the agreed restriction message; staff/admin
+    without reviews see no write button.
+
+    Centralize create, edit, and delete authorization logic so the
+    templates and views use the same rules, and enforce authorization on
+    both GET and POST. Redirect anonymous users to login where
+    appropriate, but return HTTP 403 Forbidden for authenticated users who
+    attempt an unauthorized review action. Preserve the rule that authors
+    may always delete their own reviews.
+
+    Continue to Question 14, one question at a time. Do not write code
+    yet.
+15. *(Question 14: the back-office Reviews tab.)* I choose Option A: A
+    back-office Reviews list, individual review detail pages, and a
+    separate Restrictions page.
+
+    Use /manage/reviews/ with All, Published, and Hidden filters, newest
+    first, 25 reviews per page. Include product, reviewer username, star
+    rating, shortened comment, posted date, status, and moderation
+    information where applicable.
+
+    Use /manage/reviews/<pk>/ for the full review and moderation controls.
+    Hiding requires a reason of 1–200 characters. Staff can restore hidden
+    reviews but cannot permanently delete reviews through the back office.
+
+    Use /manage/reviews/restrictions/ to show active restrictions and
+    allow staff to clear them with an explicit confirmation step.
+
+    Place Reviews between Discount codes and Dashboard in the back-office
+    navigation. Follow existing StaffRequiredMixin, CSRF, POST-only,
+    flash-message, pagination, and empty-state conventions. Make repeated
+    moderation actions idempotent.
+
+    Keep views thin and use centralized model or service methods for
+    moderation and restriction logic. Do not add a new deep module unless
+    an actual requirement makes it necessary.
+
+    Continue to Question 15, one question at a time. Do not write code
+    yet.
+16. *(Question 15: unavailable and deleted products.)* I choose Option A.
+    Unavailable products should continue displaying published reviews and
+    ratings, and eligible customers can still create or edit reviews for
+    them.
+
+    When a product is permanently deleted, its Review and
+    ReviewRestriction records should be deleted through CASCADE,
+    consistent with the existing store behavior.
+
+    Update the product deletion confirmation page to warn staff how many
+    associated reviews will be permanently deleted. The warning should
+    make clear that this action cannot be undone through the application.
+
+    Review eligibility must match the actual product record referenced by
+    a Delivered OrderItem, not simply a matching product name or slug.
+    Unavailable products should continue displaying average ratings on
+    their catalog cards.
+
+    Preserve all previously agreed customer authorization and staff
+    moderation rules. Continue to Question 16, one question at a time. Do
+    not write code yet.
+17. *(Question 16: deleted accounts.)* I choose Option A.
+
+    When a customer account is deleted, their reviews and
+    ReviewRestriction records should be deleted through CASCADE. Published
+    review averages and counts should update automatically.
+
+    When a staff moderator's account is deleted, hidden_by should use
+    SET_NULL on reviews and restrictions. The review must remain hidden
+    and the restriction must remain active. Moderation status must be
+    stored independently of hidden_by.
+
+    In the staff back office, display 'Former staff member' when the
+    moderator account no longer exists. Do not store an additional copy of
+    the moderator's username.
+
+    Follow existing Django account deletion conventions and preserve all
+    previously agreed authorization and moderation rules.
+
+    Continue to Question 17, one question at a time. Do not write code
+    yet.
+18. *(Question 17: seed data.)* I choose Option C: Create a full,
+    repeatable demo world for product reviews.
+
+    Seed the demo customer with a published MindSync review, a hidden
+    DreamWeaver review with a moderation reason, and no SyncRest review so
+    the Write Review state is available. Preserve the ineligible states
+    for Shipped and Placed orders.
+
+    Seed background customer reviews only for products they actually have
+    in Delivered orders. Include varied ratings and comments, at least one
+    product with more than 10 published reviews for pagination, some
+    products with no reviews, additional hidden reviews, one active
+    ReviewRestriction, and some edited reviews.
+
+    Use fixed timezone-aware UTC calendar timestamps for reviews and
+    moderation records, not relative offsets from timezone.now(). Use an
+    independent deterministic RNG where randomness is needed, and ensure
+    existing seeded orders and dashboard metrics do not change.
+
+    Update _wipe, the seed success message, and automated tests to cover
+    review eligibility, seeded states, timestamps, exact repeatability,
+    and preservation of existing seed data.
+
+    Do not run seed against my personal db.sqlite3 or touch
+    db.sqlite3.before-wishlist-backup. We can create a separate database
+    backup before any future migration. Continue to Question 18 one
+    question at a time. Do not write code yet.
+19. *(Question 18: fixed dates versus orders dated relative to now.)* I
+    choose Option B: Anchor each seeded review's timestamps to the
+    customer's qualifying Delivered order rather than using fixed absolute
+    calendar dates.
+
+    Use deterministic offsets after the qualifying order for created_at,
+    edited_at, hidden_at, and other moderation timestamps. Ensure the
+    timeline is chronologically valid and no timestamp is in the future.
+    Use timezone-aware UTC values throughout.
+
+    Preserve the existing seeded orders and dashboard data exactly as they
+    are. Use an independent deterministic RNG for background review data
+    so it does not alter the orders RNG sequence.
+
+    For automated repeatability tests, freeze the clock at a known instant
+    and compare exact seeded review data, including timestamps, across
+    runs. Also test that reviews occur after their qualifying order and
+    that edits and moderation occur after the original review.
+
+    This intentionally replaces my earlier request for fixed absolute
+    calendar timestamps because reviews depend on the order timeline,
+    unlike wishlist items.
+
+    Continue to Question 19, one question at a time. Do not write code
+    yet.
+20. *(Question 19: what's out of scope.)* I choose Option A. Accept the
+    proposed out-of-scope table exactly as recommended. All listed extras
+    are out of scope except Django admin registration for Review and
+    ReviewRestriction, which is required.
+
+    Also include the duplicate-submission safeguard: enforce one review
+    per customer per product with a database uniqueness constraint, and
+    gracefully handle concurrent or repeated form submissions without a
+    500 error.
+
+    The interview decisions are now approved. Please draft
+    prd/product-reviews.md based on all 19 questions and answers,
+    following the existing PRD conventions. Include goals, user stories,
+    data model, authorization, moderation, customer and staff flows,
+    security, acceptance criteria, out-of-scope features, and data safety
+    requirements.
+
+    Show me the complete proposed PRD and stop for my review before saving
+    it or writing the implementation plan. Do not implement any code, run
+    seed, modify db.sqlite3, or touch the backup.
+21. I approve the overall Product Reviews PRD with these decisions and
+    clarifications:
+
+    1. Use /backoffice/reviews/ URLs, matching the project's existing
+    conventions. Do not introduce a new /manage/ prefix.
+    2. Approve a separate reviews Django app with namespace reviews:.
+    3. Approve all four flagged defaults: edited_at changes only for
+    actual edits; moderation fields are read-only in Django admin; missing
+    own reviews return 404 for edit/delete; and existing restrictions are
+    updated instead of duplicated.
+    4. Leave the choice of TDD candidates and phase workflow for the
+    implementation plan. Preserve the /tdd and /implement approval
+    checkpoints.
+
+    Before saving, make two clarifications:
+    - Verify whether existing seeded Delivered orders have enough distinct
+    eligible customers to create more than 10 published reviews for one
+    product without changing existing orders. If not, flag this as an
+    unresolved constraint rather than inventing ineligible reviews or
+    changing the seed orders silently.
+    - Make clear that clearing a restriction uses GET for a confirmation
+    page and POST-only for the actual removal, with CSRF protection and
+    staff authorization.
+
+    Please revise and save prd/product-reviews.md, then confirm the saved
+    file. After that, draft plans/product-reviews.md with small,
+    independently testable phases, explicit acceptance criteria, test
+    feedback loops, browser verification steps, and stop-for-approval
+    gates. Show me the proposed plan for review before saving it or
+    writing implementation code.
+
+    Do not run seed, make migrations, alter db.sqlite3, or touch
+    db.sqlite3.before-wishlist-backup.
+
+### Summary
+- **Outcome:** a 19-question `/grill-me` interview settled the product
+  reviews design, and the first version of `prd/product-reviews.md` was
+  saved. No code, migrations or plan file were written, `seed` never ran,
+  and `db.sqlite3` and `db.sqlite3.before-wishlist-backup` weren't
+  touched.
+  - **Exploration:** before Question 1 the agent read `CLAUDE.md`,
+    `docs/TEMPLATES.md`, the product, order and wishlist models, the
+    product views and detail template, the back-office navigation and the
+    seed's users.
+  - **The interview (prompts 2–20):** one question at a time, each with
+    options and a recommendation. The questions covered who may review,
+    staff, one review per product, review contents, post-moderation,
+    moderators, the author's view of a hidden review, order status
+    changes, the restriction model, where ratings appear, identity,
+    pagination, the customer pages, the back-office tab, product
+    lifecycle, account deletion, seed data, seed timestamps, and scope.
+    The developer chose the recommended option every time and added
+    detailed requirements of their own to most answers.
+  - **The PRD (prompts 20–21):**
+    - A full draft was shown in chat and not saved.
+    - After prompt 21 the agent checked the seed code, without running
+      it, and saved the revised PRD (435 lines). That was the only file
+      written. It uses `/backoffice/reviews/`, states the four defaults as
+      decisions, makes clearing a restriction a GET confirmation then a
+      POST, and adds an "Unresolved Constraints" section.
+  - **The plan:** a **seven-phase** draft of `plans/product-reviews.md`
+    was shown in chat and **not saved**. The agent ended by asking about
+    phase size, how to resolve the seed constraint, and approval to save.
+    The session ended there, with no reply. The work resumed on
+    2026-10-18 in the entry "Product reviews: PRD finalized, six-phase
+    plan, Phase 1", where the PRD was finalized and a six-phase plan was
+    approved and saved.
+  - **Skills:** only `/grill-me` was invoked. **`/to-prd` was not
+    invoked.** The transcript has no Skill tool calls, and the agent
+    never read `.claude/skills/to-prd/SKILL.md`; it drafted the PRD
+    directly at the developer's request. Before drafting the plan it read
+    `.claude/skills/prd-to-plan/SKILL.md` with `cat`, but `/prd-to-plan`
+    was not invoked either.
+- **Deviations:**
+  - **The developer replaced their own earlier answer.** Prompt 18 asked
+    for fixed calendar timestamps in the seed. Question 18 pointed out
+    that seeded orders are dated relative to "now", so fixed review dates
+    would eventually come before their orders. Prompt 19 switched to
+    offsets from each review's qualifying order.
+  - **The `/manage/` URL prefix was dropped.** The agent proposed
+    `/manage/reviews/` in Question 14, and the developer approved it
+    (prompt 15). While drafting the PRD the agent found that the existing
+    routes use `/backoffice/`, and flagged it. Prompt 21 chose
+    `/backoffice/reviews/`.
+  - **Undiscussed details were flagged as defaults** rather than decided
+    silently: a separate `reviews` app, and the four defaults approved in
+    prompt 21.
+- **Sideways:**
+  - **The 10-review seed conflict went unnoticed during the interview.**
+    Prompt 18 asked for a seeded product with more than 10 published
+    reviews. The agent recorded it, and it went into the PRD draft, without
+    being checked. It was found only when prompt 21 asked for a check.
+    Only regular customers can review, and the seed has exactly 10 of
+    them, so no product can pass 10. The saved PRD flagged it as
+    unresolved, with three options. It was resolved on 2026-10-18.
+  - **The session wasn't logged.** It ended at the plan review without the
+    session-log prompt. This entry was added on 2026-10-18 from the
+    transcript.
+
 ## 2026-10-18 — Product reviews Phase 6: demo reviews in the seed
 
 ### Prompts

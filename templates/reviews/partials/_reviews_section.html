@@ -5,7 +5,21 @@
 <section id="reviews" class="mt-10" aria-labelledby="reviews-heading">
   <h2 id="reviews-heading" class="text-2xl font-bold">Reviews</h2>
 
-  <div class="mt-4">
+  {# An inline action's message shows here. On a full page base.html #}
+  {# already shows it, so it's left out to avoid saying it twice. #}
+  {% if htmx and messages %}
+    <div class="mt-4 space-y-2">
+      {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}" role="status">
+          <span>{{ message }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {# Write, Edit and Delete keep their real links — without JavaScript #}
+  {# they open their own pages — and with HTMX load inline, right here. #}
+  <div id="your-review" class="mt-4">
     {% if review_state == "anonymous" %}
       <a href="{% url 'accounts:login' %}?next={{ product.get_absolute_url|urlencode }}"
          class="btn btn-outline btn-sm">Sign in to review</a>
@@ -21,12 +35,18 @@
       {# Delete is always the author's; Edit only while can_edit allows it. #}
       <div class="mt-2 flex flex-wrap gap-2">
         {% if can_edit_review %}
-          <a href="{% url 'reviews:edit' product.slug %}" class="btn btn-outline btn-sm">Edit</a>
+          {% url 'reviews:edit' product.slug as edit_url %}
+          <a href="{{ edit_url }}" hx-get="{{ edit_url }}" hx-target="#your-review"
+             class="btn btn-outline btn-sm">Edit</a>
         {% endif %}
-        <a href="{% url 'reviews:delete' product.slug %}" class="btn btn-ghost btn-sm">Delete</a>
+        {% url 'reviews:delete' product.slug as delete_url %}
+        <a href="{{ delete_url }}" hx-get="{{ delete_url }}" hx-target="#your-review"
+           class="btn btn-ghost btn-sm">Delete</a>
       </div>
     {% elif review_state == "eligible" %}
-      <a href="{% url 'reviews:create' product.slug %}" class="btn btn-primary btn-sm">Write a review</a>
+      {% url 'reviews:create' product.slug as create_url %}
+      <a href="{{ create_url }}" hx-get="{{ create_url }}" hx-target="#your-review"
+         class="btn btn-primary btn-sm">Write a review</a>
     {% elif review_state == "restricted" %}
       <p class="opacity-70">You cannot currently review this product. If you believe this is a mistake, please contact our team.</p>
     {% elif review_state == "ineligible" %}

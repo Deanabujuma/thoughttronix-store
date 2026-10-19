@@ -1,0 +1,19 @@
+{# Asking before deleting your review. Include with product and inline. #}
+{# The standalone page includes it plain — the no-JavaScript path. With #}
+{# inline, it loads into "Your review": the delete posts with HTMX (the #}
+{# section swaps in), and Keep it puts the section back as it was. #}
+<div>
+  {% if inline %}
+    <h3 class="font-semibold">Delete your review of {{ product.name }}?</h3>
+  {% endif %}
+  <p class="mt-2 opacity-80">Your review will be removed for good. This can't be undone.</p>
+
+  {# Only this POST deletes; opening it changes nothing. #}
+  <form method="post" class="mt-4 flex gap-2"
+        {% if inline %}hx-post="{{ request.path }}"{% endif %}>
+    {% csrf_token %}
+    <button type="submit" class="btn btn-error">Delete review</button>
+    <a href="{{ product.get_absolute_url }}#reviews" class="btn btn-ghost"
+       {% if inline %}{% include "reviews/partials/_restore_section_attrs.html" %}{% endif %}>Keep it</a>
+  </form>
+</div>

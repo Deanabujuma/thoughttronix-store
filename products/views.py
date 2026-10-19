@@ -1,5 +1,4 @@
 from django.contrib.messages.views import SuccessMessageMixin
-from django.core.paginator import Paginator
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -13,13 +12,11 @@ from django.views.generic import (
 )
 
 from accounts.mixins import StaffRequiredMixin
-from reviews.models import Review
+from reviews.views import reviews_section_context
 from wishlist.models import Wishlist
 
 from .forms import CategoryForm, ProductForm, TagForm
 from .models import Category, Product, Tag
-
-REVIEWS_PER_PAGE = 10
 
 
 class CatalogView(ListView):
@@ -86,30 +83,8 @@ class ProductDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        user, product = self.request.user, self.object
-        own_review = Review.objects.own(user, product)
-        reviews = (
-            Review.objects.published()
-            .filter(product=product)
-            .order_by("-created_at", "-pk")
-        )
-        if own_review:
-            reviews = reviews.exclude(pk=own_review.pk)
-        # Paged on ?reviews=N, so the catalog's own ?page=N never collides.
-        # get_page never errors: not a number → page 1; out of range
-        # (0 and negatives too) → the last page.
-        review_page = Paginator(reviews, REVIEWS_PER_PAGE).get_page(
-            self.request.GET.get("reviews", 1)
-        )
-        context.update(
-            saved=Wishlist.has_saved(user, product),
-            rating=Review.objects.summary_for(product),
-            own_review=own_review,
-            # The author may always delete; Edit shows only while allowed.
-            can_edit_review=bool(own_review and own_review.can_edit(user)),
-            review_state=Review.objects.visitor_state(user, product, own_review),
-            reviews=review_page,
-        )
+        context["saved"] = Wishlist.has_saved(self.request.user, self.object)
+        context.update(reviews_section_context(self.request, self.object))
         return context
 
 

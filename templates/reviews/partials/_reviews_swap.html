@@ -1,0 +1,5 @@
+{# The answer to a successful inline review action: the whole #reviews #}
+{# section (the view retargets the swap to it), plus the rating summary #}
+{# near the price, out of band. #}
+{% include "reviews/partials/_reviews_section.html" %}
+{% include "reviews/partials/_detail_rating_summary.html" with oob=True %}

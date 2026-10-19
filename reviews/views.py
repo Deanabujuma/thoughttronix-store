@@ -5,12 +5,23 @@ pk ever appears. The rules live on the model and are checked on GET and
 POST alike.
 """
 
+from http import HTTPStatus
+
 from django.contrib import messages
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.views import redirect_to_login
+from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.http import Http404
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseForbidden,
+    HttpResponseNotFound,
+)
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.vary import vary_on_headers
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -25,17 +36,137 @@ from products.models import Product
 from .forms import HideReviewForm, ReviewForm
 from .models import Review, ReviewRestriction
 
+REVIEWS_PER_PAGE = 10
 
-class ReviewCreateView(UserPassesTestMixin, CreateView):
-    """Write a review. Anonymous → login; signed in but not allowed → 403.
 
-    A customer who already has a review — a double click, a second tab —
-    is sent back to the product with a message instead, and never gets a
-    second row or an error page.
+def reviews_section_context(request, product):
+    """Everything the product page's ``#reviews`` section needs.
+
+    One source for the detail page and the inline HTMX responses, so the
+    section reads the same however it's rendered. The visitor's own
+    review is pinned on its own, so it's left out of the public list.
     """
+    user = request.user
+    own_review = Review.objects.own(user, product)
+    reviews = (
+        Review.objects.published()
+        .filter(product=product)
+        .order_by("-created_at", "-pk")
+    )
+    if own_review:
+        reviews = reviews.exclude(pk=own_review.pk)
+    # Paged on ?reviews=N, so the catalog's own ?page=N never collides.
+    # get_page never errors: not a number → page 1; out of range
+    # (0 and negatives too) → the last page.
+    review_page = Paginator(reviews, REVIEWS_PER_PAGE).get_page(
+        request.GET.get("reviews", 1)
+    )
+    return {
+        "rating": Review.objects.summary_for(product),
+        "own_review": own_review,
+        # The author may always delete; Edit shows only while allowed.
+        "can_edit_review": bool(own_review and own_review.can_edit(user)),
+        "review_state": Review.objects.visitor_state(user, product, own_review),
+        "reviews": review_page,
+    }
+
+
+def is_htmx(request):
+    """Whether HTMX sent this request — the product page's inline actions."""
+    return request.headers.get("HX-Request") == "true"
+
+
+def refreshing(response):
+    """Tell HTMX to reload the page. It doesn't swap an error response, so
+    a refused inline action reloads the page into its true state."""
+    response["HX-Refresh"] = "true"
+    return response
+
+
+class ReviewActionMixin:
+    """How a review action answers HTMX — after success, and when refused.
+
+    Success: an inline request gets the re-rendered ``#reviews`` section,
+    with the flash message inside it, and the rating summary near the
+    price out of band; any other request is redirected to the product page.
+
+    Refused: the rules and status codes are the ones every request gets.
+    Only the shape changes for HTMX — a 204 that sends the browser to the
+    login page (a plain redirect would be followed and swapped in), or the
+    403 with a page refresh.
+
+    A GET, or a form with errors, renders ``inline_template_name`` — the
+    piece that loads into the "Your review" area — for HTMX, and the
+    standalone page (``template_name``) for everyone else.
+    """
+
+    inline_template_name = None
+
+    def get_template_names(self):
+        if is_htmx(self.request):
+            return [self.inline_template_name]
+        return super().get_template_names()
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(
+            product=self.product, inline=is_htmx(self.request), **kwargs
+        )
+
+    def get_success_url(self):
+        return f"{self.product.get_absolute_url()}#reviews"
+
+    def handle_no_permission(self):
+        if not is_htmx(self.request):
+            return super().handle_no_permission()
+        if not self.request.user.is_authenticated:
+            login = redirect_to_login(
+                self.request.get_full_path(),
+                self.get_login_url(),
+                self.get_redirect_field_name(),
+            )
+            response = HttpResponse(status=HTTPStatus.NO_CONTENT)
+            response["HX-Redirect"] = login.url
+            return response
+        return refreshing(HttpResponseForbidden())
+
+    def finished(self):
+        if not is_htmx(self.request):
+            return redirect(self.get_success_url())
+        context = {
+            "product": self.product,
+            "htmx": True,
+            **reviews_section_context(self.request, self.product),
+        }
+        response = render(self.request, "reviews/partials/_reviews_swap.html", context)
+        response["HX-Retarget"] = "#reviews"
+        response["HX-Reswap"] = "outerHTML"
+        return response
+
+
+class ReviewFormMixin:
+    """The write and edit form: the standalone page, or — for HTMX — the
+    form alone, posting back inline. A form with errors comes back the same
+    way, so with HTMX it replaces itself in place on the product page."""
 
     form_class = ReviewForm
     template_name = "reviews/review_form.html"
+    inline_template_name = "reviews/partials/_review_form.html"
+
+
+# One URL answers HTMX and plain requests differently, so caches must too.
+vary_on_htmx = method_decorator(vary_on_headers("HX-Request"), name="dispatch")
+
+
+@vary_on_htmx
+class ReviewCreateView(
+    ReviewFormMixin, ReviewActionMixin, UserPassesTestMixin, CreateView
+):
+    """Write a review. Anonymous → login; signed in but not allowed → 403.
+
+    A customer who already has a review — a double click, a second tab —
+    is sent back to the product with a message instead (or, inline, shown
+    the section with it), and never gets a second row or an error page.
+    """
 
     def dispatch(self, request, *args, **kwargs):
         self.product = get_object_or_404(Product, slug=kwargs["slug"])
@@ -46,9 +177,6 @@ class ReviewCreateView(UserPassesTestMixin, CreateView):
     def test_func(self):
         return Review.objects.can_create(self.request.user, self.product)
 
-    def get_context_data(self, **kwargs):
-        return super().get_context_data(product=self.product, **kwargs)
-
     def form_valid(self, form):
         form.instance.user = self.request.user
         form.instance.product = self.product
@@ -57,24 +185,21 @@ class ReviewCreateView(UserPassesTestMixin, CreateView):
         # loser's failed insert from breaking the rest of the request.
         try:
             with transaction.atomic():
-                response = super().form_valid(form)
+                super().form_valid(form)
         except IntegrityError:
             # Only the duplicate is expected — anything else re-raises.
             if not Review.objects.own(self.request.user, self.product):
                 raise
             return self.already_reviewed()
         messages.success(self.request, "Thanks — your review is live.")
-        return response
+        return self.finished()
 
     def already_reviewed(self):
         messages.info(self.request, "You've already reviewed this product.")
-        return redirect(self.get_success_url())
-
-    def get_success_url(self):
-        return f"{self.product.get_absolute_url()}#reviews"
+        return self.finished()
 
 
-class OwnReviewMixin(UserPassesTestMixin):
+class OwnReviewMixin(ReviewActionMixin, UserPassesTestMixin):
     """Acts on ``request.user``'s own review of the product in the URL.
 
     The URL names the product, never the review, so no request can reach
@@ -87,6 +212,8 @@ class OwnReviewMixin(UserPassesTestMixin):
         self.product = get_object_or_404(Product, slug=kwargs["slug"])
         self.review = Review.objects.own(request.user, self.product)
         if request.user.is_authenticated and self.review is None:
+            if is_htmx(request):
+                return refreshing(HttpResponseNotFound())
             raise Http404("You have no review of this product.")
         return super().dispatch(request, *args, **kwargs)
 
@@ -99,44 +226,39 @@ class OwnReviewMixin(UserPassesTestMixin):
     def allows(self, review):
         raise NotImplementedError
 
-    def get_success_url(self):
-        return f"{self.product.get_absolute_url()}#reviews"
 
-
-class ReviewUpdateView(OwnReviewMixin, UpdateView):
+@vary_on_htmx
+class ReviewUpdateView(ReviewFormMixin, OwnReviewMixin, UpdateView):
     """Edit your own review, while ``can_edit`` allows it."""
-
-    form_class = ReviewForm
-    template_name = "reviews/review_form.html"
 
     def allows(self, review):
         return review.can_edit(self.request.user)
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(product=self.product, editing=True, **kwargs)
+        return super().get_context_data(editing=True, **kwargs)
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        super().form_valid(form)
         messages.success(self.request, "Your review has been updated.")
-        return response
+        return self.finished()
 
 
+@vary_on_htmx
 class ReviewDeleteView(OwnReviewMixin, DeleteView):
-    """Delete your own review: GET shows a confirmation and changes
-    nothing; only the POST deletes, through ``delete_by_author``."""
+    """Delete your own review: GET shows a confirmation — a page, or inline
+    for HTMX — and changes nothing; only the POST deletes, through
+    ``delete_by_author``."""
 
     template_name = "reviews/review_confirm_delete.html"
+    inline_template_name = "reviews/partials/_review_delete_confirm.html"
 
     def allows(self, review):
         return review.can_delete(self.request.user)
 
-    def get_context_data(self, **kwargs):
-        return super().get_context_data(product=self.product, **kwargs)
-
     def form_valid(self, form):
         self.object.delete_by_author()
         messages.success(self.request, "Your review has been deleted.")
-        return redirect(self.get_success_url())
+        return self.finished()
 
 
 # --- The back office: moderation ---------------------------------------------

@@ -1,6 +1,6 @@
 # PRD: The ThoughtTronix Store — Product Reviews
 
-*Settled in a design interview on 2026-10-16. Extends `prd/core-platform.md`; where the two disagree, this document wins for product reviews only.*
+*Settled in a design interview on 2026-10-16. Extends `prd/core-platform.md`; where the two disagree, this document wins for product reviews only. Amended on 2026-10-18: create, edit and delete also work inline with HTMX. See **Amendment: inline HTMX review actions**, which reverses the interview's Q13 decision.*
 
 ---
 
@@ -155,6 +155,8 @@ All rules live on the model, for example `Review.objects.can_create(user, produc
   - Edit or delete page with no review of yours to act on → **404**.
 
 ### Customer flows and URLs (`reviews:` namespace)
+
+> **Amended 2026-10-18.** The pages below remain the no-JavaScript path. With JavaScript, the same URLs also serve inline HTMX versions of all three actions. See **Amendment: inline HTMX review actions**.
 
 Every URL is built from the product slug plus the signed-in user. No review pk appears anywhere, so no URL can reach another user's review.
 
@@ -415,6 +417,85 @@ The developer confirmed these four defaults on 2026-10-18. Each one is already r
 2. The moderation fields (`status`, `hidden_by`, `hidden_at`, `hidden_reason`) are read-only in the Django admin.
 3. The edit and delete pages return **HTTP 404** when the signed-in user has no review of the product to act on.
 4. If a `ReviewRestriction` already exists for the (user, product) pair, `delete_by_author()` updates it rather than creating a duplicate.
+
+## Amendment: inline HTMX review actions
+
+*Approved by the developer on 2026-10-18, after Phases 1–6 were built and pushed.*
+
+### What changed, and why
+
+- **The original decision.** In the design interview (Q13, 2026-10-16), the agent offered three options:
+  - (A) separate pages;
+  - (B) an inline form;
+  - (C) an inline form submitted with HTMX.
+
+  It recommended A. The developer chose A: *"Separate Django pages for writing, editing, and deleting product reviews, using standard class-based views and normal form submissions."* Phases 1–6 built exactly that, and no review template uses HTMX.
+- **The correction.** A final audit confirmed that creating, editing and deleting don't use `hx-post`. The developer decided they should work inline with HTMX, like the store's other customer actions (cart, wishlist and discount code).
+- **What stays.** The A pages aren't removed. They remain the no-JavaScript path, unchanged. HTMX is added on top, on the same URLs. This amends Q13; it doesn't erase it.
+
+### Decisions
+
+- **No new URLs, models, migrations or dependencies.** `reviews:create`, `reviews:edit` and `reviews:delete` keep their views. Every authorization rule (`can_create`, `can_edit`, `can_delete`, and `OwnReviewMixin`'s login → 404 → 403 order) runs first and is unchanged.
+- **One endpoint, two kinds of response.** A request with the header `HX-Request: true` gets a partial. Any other request gets exactly today's full page or redirect.
+- **Progressive enhancement.** Each trigger keeps its real `href` and adds `hx-get`, so without JavaScript it opens the existing page. The standalone form and confirmation pages contain no HTMX attributes.
+- **Swap targets** on the product page:
+  - `#your-review`, the "Your review" area;
+  - `#reviews`, the whole section, which already exists;
+  - `#rating-summary`, the summary near the price, updated out-of-band.
+
+| Step | Request | Response | Swap |
+|---|---|---|---|
+| **Write a review** / **Edit** | `hx-get` create / edit | The form partial; edit is pre-filled | Inside `#your-review` |
+| **Delete** | `hx-get` delete | The inline confirmation partial; changes nothing | Inside `#your-review` |
+| Invalid submit | `hx-post` create / edit | The form partial with its errors, status 200 | The form replaces itself |
+| Successful create, edit or delete | `hx-post` | The re-rendered `#reviews` section, with its flash message shown inside it, plus `#rating-summary` out-of-band | `HX-Retarget: #reviews`, `HX-Reswap: outerHTML` |
+| Duplicate create | `hx-post` create | The section with "You've already reviewed this product." | As for success |
+| **Cancel** / **Keep it** | `hx-get` the product page, `hx-select="#reviews"` | The section from the normal detail page | `#reviews`, `outerHTML` |
+
+- **Refusals keep their meaning under HTMX:**
+  - **Anonymous:** no redirect, because HTMX would follow it and swap the login page into the target. The response is 204 with `HX-Redirect` to the login page, with `next`.
+  - **Signed in but not allowed:** 403 with `HX-Refresh: true`.
+  - **No review of yours:** 404 with `HX-Refresh: true`.
+
+  HTMX doesn't swap error responses, so the refresh reloads the page into its true state.
+- **Unchanged behavior:**
+  - `edited_at` still changes only on a real change.
+  - Deleting still runs only through `delete_by_author()`, so deleting a hidden review still leaves a restriction, and the re-rendered section shows its message.
+  - The duplicate-submit savepoint is unchanged.
+- **CSRF:** the forms keep `{% csrf_token %}`, and `base.html` already sends `X-CSRFToken` on every HTMX request.
+- **Caching:** responses from these three views send `Vary: HX-Request`.
+- **Messages:** only HTMX responses show messages inside the section. On a full page, `base.html` shows them, so the section doesn't repeat them.
+- **One source for the section.** The detail page's review context moves out of `ProductDetailView` into one shared helper, used by the page and by the HTMX success response.
+- **Templates:**
+  - new partials `_review_form.html`, `_review_delete_confirm.html` and `_detail_rating_summary.html`, under `templates/reviews/partials/`;
+  - the standalone pages include the first two without HTMX attributes;
+  - only classes already in the compiled CSS are used.
+- **Still out of scope:**
+  - HTMX for back-office hide, restore and clear restriction;
+  - HTMX pagination ("show more", Q12).
+
+### Acceptance criteria
+
+19. With JavaScript, create, edit and delete happen inline on the product page through `hx-post`. Each success updates the reviews section and the rating summary without a page load.
+20. Invalid HTMX submissions re-render only the form with its errors and change nothing. A duplicate HTMX create leaves one row and never returns a 500.
+21. Under HTMX, every refusal keeps its meaning: anonymous → login with `next`, not allowed → 403, no review of yours → 404. Nothing changes.
+22. Without JavaScript, every flow works exactly as before. The full existing suite passes unchanged.
+23. HTMX requests are CSRF-protected: a post without a token is refused.
+
+### Testing
+
+- A new `reviews/test_htmx.py`. Requests send the `HX-Request: true` header.
+- It covers:
+  - the partials on GET (no `<html>`, a CSRF token, the edit form pre-filled, delete GET changes nothing);
+  - success swaps for all three actions;
+  - invalid and duplicate submits;
+  - refusals across actions and methods;
+  - deleting a hidden review creating a restriction;
+  - `enforce_csrf_checks`;
+  - `Vary`;
+  - escaping and no usernames in HTMX responses;
+  - the trigger markup (`href` plus `hx-get`, and no `hx-post` on the standalone pages).
+- The existing tests are the no-JavaScript regression check and must pass unchanged.
 
 ## Out of Scope
 

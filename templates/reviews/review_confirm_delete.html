@@ -12,12 +12,6 @@
   </div>
 
   <h1 class="text-3xl font-bold">Delete your review of {{ product.name }}?</h1>
-  <p class="mt-4 opacity-80">Your review will be removed for good. This can't be undone.</p>
-
-  {# Only this POST deletes; opening the page changes nothing. #}
-  <form method="post" class="mt-6 flex gap-2">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-error">Delete review</button>
-    <a href="{{ product.get_absolute_url }}#reviews" class="btn btn-ghost">Keep it</a>
-  </form>
+  {# The no-JavaScript path: the plain form, with no HTMX attributes. #}
+  {% include "reviews/partials/_review_delete_confirm.html" with inline=False %}
 {% endblock %}

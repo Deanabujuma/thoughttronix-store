@@ -28,9 +28,7 @@
       {% endif %}
 
       <p class="mt-6 text-3xl font-semibold text-primary">${{ product.price|intcomma }}</p>
-      <div class="mt-2">
-        {% include "reviews/partials/_rating_summary.html" with average=rating.average count=rating.count %}
-      </div>
+      {% include "reviews/partials/_detail_rating_summary.html" %}
 
       <div class="mt-4 flex flex-wrap gap-2">
         {% if product.is_featured %}

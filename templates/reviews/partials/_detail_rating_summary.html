@@ -1,0 +1,7 @@
+{# The rating summary near the price on the product page. It has an id, #}
+{# so an inline review action can replace it out of band — include with #}
+{# oob=True in an HTMX response. Catalog cards use _rating_summary.html #}
+{# directly, since one id can't repeat on a page. #}
+<div id="rating-summary" class="mt-2"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% include "reviews/partials/_rating_summary.html" with average=rating.average count=rating.count %}
+</div>

@@ -2,7 +2,7 @@
 
 > Source PRD: `prd/product-reviews.md`
 
-*The PRD owns the decisions; this plan owns the sequence. Each phase is a thin vertical slice through model, migration, view, template, and tests. The suite and Ruff are green at every phase boundary, and each phase ends with the developer's browser verification (or, for Phase 6, the approved automated verification) before the next begins. Approved by the developer on 2026-10-18 as six phases, with Phases 4 and 5 kept separate.*
+*The PRD owns the decisions; this plan owns the sequence. Each phase is a thin vertical slice through model, migration, view, template, and tests. The suite and Ruff are green at every phase boundary, and each phase ends with the developer's browser verification (or, for Phase 6, the approved automated verification) before the next begins. Approved by the developer on 2026-10-18 as six phases, with Phases 4 and 5 kept separate. Phase 7 was added later the same day as a correction: inline HTMX for create, edit and delete (PRD, **Amendment: inline HTMX review actions**).*
 
 ## Architectural decisions
 
@@ -16,6 +16,8 @@ Durable decisions that apply across all phases:
   | `/products/<slug>/review/` | `reviews:create` | GET, POST |
   | `/products/<slug>/review/edit/` | `reviews:edit` | GET, POST |
   | `/products/<slug>/review/delete/` | `reviews:delete` | GET (confirmation), POST |
+
+  Phase 7 adds HTMX responses on these same URLs. It adds no new URLs.
 
 - **Back-office URLs** use the existing `/backoffice/` prefix and `StaffRequiredMixin` (`accounts/mixins.py`), with `section = "reviews"`. The tab goes between Discount codes and Dashboard in `templates/backoffice/base.html`:
 
@@ -330,3 +332,64 @@ Seed support for reviews, verified **only by automated tests on the isolated tes
 1. `uv run pytest` passes in full, including the new and existing seed tests.
 2. `uv run ruff check .` and `uv run ruff format --check .` are clean.
 3. The developer reviews the seed test output. `db.sqlite3` and both backups are untouched.
+
+---
+
+## Phase 7: Inline HTMX for create, edit and delete (correction)
+
+**Source**: PRD, **Amendment: inline HTMX review actions** (AC 19–23). This corrects interview Q13. The separate pages from Phases 1–2 stay as the no-JavaScript path.
+
+### What to build
+
+- **Product page:** the **Write a review**, **Edit** and **Delete** links keep their `href` and gain `hx-get`. The form or confirmation loads into `#your-review`, and submits with `hx-post` to the same URL.
+- **Responses for HTMX requests:**
+  - a success re-renders the `#reviews` section, plus `#rating-summary` out-of-band;
+  - an invalid submit re-renders only the form;
+  - a refusal keeps its status and tells HTMX to redirect or refresh.
+- **Requests without HTMX** behave exactly as they do now.
+
+### Acceptance criteria
+
+- [ ] No new URLs, models, migrations or dependencies. The authorization rules and `OwnReviewMixin`'s order (login → 404 → 403) are unchanged.
+- [ ] `hx-get` on create, edit and delete returns a partial (no `<html>`) that posts back to the same URL with a CSRF token. Edit is pre-filled. The delete GET changes nothing.
+- [ ] A successful `hx-post` on create, edit or delete returns the `#reviews` section with `HX-Retarget: #reviews` and `HX-Reswap: outerHTML`, the flash message inside it, and an out-of-band `#rating-summary` with the new average and count.
+- [ ] Invalid HTMX submissions return the form with its errors and change nothing. A duplicate HTMX create, repeated or concurrent, returns the section with "You've already reviewed this product.", leaves one row, and never returns a 500.
+- [ ] HTMX refusals:
+  - anonymous → 204 with `HX-Redirect` to the login page, with `next`;
+  - not allowed → 403 with `HX-Refresh: true`;
+  - no review of yours → 404 with `HX-Refresh: true`;
+  - nothing changes in any case.
+- [ ] `edited_at` changes only on a real change. Deleting runs through `delete_by_author()`, so a hidden review leaves a restriction and the section shows the restriction message.
+- [ ] **Cancel** and **Keep it** restore the section (`hx-get` the product page with `hx-select="#reviews"`).
+- [ ] Responses send `Vary: HX-Request`. HTMX responses escape comments and contain no username.
+- [ ] An HTMX post without a CSRF token is refused (`enforce_csrf_checks`).
+- [ ] The standalone pages contain no `hx-post`, and all 784 existing tests pass unchanged.
+- [ ] The detail page and the HTMX success response build the section from one shared context helper.
+
+### `/tdd` candidates
+
+1. A successful HTMX create, edit or delete swaps the reviews section and the rating summary.
+2. An invalid or duplicate HTMX submission re-renders only the form, or the section, and changes nothing.
+3. Under HTMX, refusals keep their meaning: login with `next`, 403 and 404, with nothing changed.
+
+### Testing
+
+- `reviews/test_htmx.py`: everything above, with `headers={"HX-Request": "true"}`.
+- The existing suite is the no-JavaScript regression check and is not edited.
+
+### Browser verification
+
+Use a temporary review, so the existing MindSync and DreamWeaver reviews stay as they are. Don't delete DreamWeaver, which would create a real restriction. No `migrate` or `seed` is needed.
+
+1. **JavaScript on:**
+   - **Write a review** opens inline, and the URL doesn't change.
+   - Submitting with no stars shows the error inline.
+   - A keyboard-chosen rating submits. The section, the summary near the price and the message all update.
+2. **Edit:** an unchanged save shows no "Edited". A change shows "Edited", and the review keeps its place. **Cancel** restores the section.
+3. **Delete:** the confirmation opens inline. **Keep it** restores the section. Confirming brings back **Write a review** and lowers the count.
+4. **Double submit,** or a second tab, gives "already reviewed", with no error.
+5. **DevTools → Network:** requests carry `HX-Request` and `X-CSRFToken`, and the responses are partials.
+6. **Sign out in another tab, then click Edit:** you're sent to the login page.
+7. **Staff** see no buttons, and the direct URLs give 403.
+8. **JavaScript disabled:** all three flows work as full pages, as before.
+9. **Refresh and Back** after inline actions show the true state.
